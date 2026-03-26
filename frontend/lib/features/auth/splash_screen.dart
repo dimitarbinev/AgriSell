@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../core/theme.dart';
 import '../../core/constants.dart';
 import '../../shared/providers/providers.dart';
@@ -36,17 +37,24 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     Future.delayed(const Duration(milliseconds: 2500), () async {
       if (!mounted) return;
       
-      final authState = ref.read(authStateProvider);
+      User? user;
+      try {
+        user = await ref.read(authStateProvider.future).timeout(const Duration(seconds: 5));
+      } catch (e) {
+        if (mounted) context.go('/login');
+        return;
+      }
+
       final storage = ref.read(storageServiceProvider);
       
-      if (authState.value != null) {
+      if (user != null) {
         // If logged in, wait for profile to load to determine role
         dynamic profileAsync;
         try {
           profileAsync = await ref.read(userProfileProvider.future).timeout(const Duration(seconds: 5));
         } catch (e) {
           // Fallback if firestore profile fetch fails
-          context.go('/login');
+          if (mounted) context.go('/login');
           return;
         }
 
@@ -64,12 +72,11 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
           } else if (role == 'buyer') {
             context.go('/buyer/home');
           } else {
-            // No role found, maybe need onboarding?
              context.go('/login');
           }
         }
       } else {
-        context.go('/login');
+        if (mounted) context.go('/login');
       }
     });
   }
