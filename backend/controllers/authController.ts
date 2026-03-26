@@ -11,7 +11,7 @@ export const register = catch_async(async (req: Request, res: Response) => {
         return res.status(400).json({message: "All fields are required"})
     }
 
-    if(!role || role !== "seller" || role !== "buyer") {
+    if(!role) {
         return res.status(400).json({message: "Invalid role"})
     }
 
@@ -22,6 +22,31 @@ export const register = catch_async(async (req: Request, res: Response) => {
     }) 
 
     const uid = userRecord.uid;
+
+    if(role === "seller"){
+      await db.collection('users').doc(uid).set({
+        name,
+        email,
+        password,
+        role,
+        mainCity: req.body.mainCity,
+        phoneNumber: req.body.phoneNumber,
+        createdAt: new Date()
+      })
+    }
+
+    if(role === "buyer"){
+      await db.collection('users').doc(uid).set({
+        name,
+        email,
+        password,
+        role,
+        preferredCity: req.body.preferredCity,
+        createdAt: new Date()
+      })
+    }
+
+    return res.status(200).json({message: "User registered successfully"})
 
 })
 
