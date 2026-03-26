@@ -102,6 +102,10 @@ export const placeOrder = catch_async(async (req: Request, res: Response) => {
 
             const listingData = listingDoc.data()!;
             const productData = productDoc.data()!;
+
+            if(listingData.status === 3 || listingData.status === 'cancelled'){
+                throw new Error("Listing is cancelled and can not take reservations");
+            }
             
             const currentQty = Number(listingData.requestedQuantity || 0);
             const requestedQty = Number(quantity);
