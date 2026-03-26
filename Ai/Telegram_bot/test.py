@@ -77,13 +77,13 @@ async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     context.user_data["phone"] = phone_clean
 
-    # Ask choice
+    # Ask to see products (User Details removed)
     keyboard = ReplyKeyboardMarkup(
-        [["User Details", "Product Details"]],
+        [["View My Products"]],
         resize_keyboard=True
     )
     await update.message.reply_text(
-        "Phone received! What would you like to see?",
+        "Phone received! Click below to see your products:",
         reply_markup=keyboard
     )
     return CHOICE
@@ -118,50 +118,30 @@ async def handle_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_data = user_doc.to_dict()
     context.user_data["user_data"] = user_data
 
-    if choice == "User Details":
-        # Print all top-level user fields except system fields
-        exclude_fields = ["phoneNumber", "createdAt", "updatedAt"]
-        user_details = {k: v for k, v in user_data.items() if k not in exclude_fields}
-        if not user_details:
-            await update.message.reply_text("No user details found.")
-        else:
-            message = "User Details:\n" + "\n".join([f"{k}: {v}" for k, v in user_details.items()])
-            await update.message.reply_text(message)
-
-        # Go back to main menu
-        keyboard = ReplyKeyboardMarkup(
-            [["User Details", "Product Details"]],
-            resize_keyboard=True
-        )
-        await update.message.reply_text("What would you like to see next?", reply_markup=keyboard)
+    # (User Details logic removed, going straight to products)
+    
+    # Fetch products from subcollection
+    products_ref = db.collection("users").document(user_doc.id).collection("products")
+    products_docs = list(products_ref.stream())
+    if not products_docs:
+        await update.message.reply_text("You have no products.")
         return CHOICE
 
-    elif choice == "Product Details":
-        # Fetch products from subcollection
-        products_ref = db.collection("users").document(user_doc.id).collection("products")
-        products_docs = list(products_ref.stream())
-        if not products_docs:
-            await update.message.reply_text("You have no products.")
-            return CHOICE
-
-        # Store products in user_data with a mapping of display name -> product data
-        product_map = {}
-        for i, doc in enumerate(products_docs):
-            p_data = doc.to_dict()
-            p_name = p_data.get("productName") or f"Product {i+1}"
-            product_map[p_name] = p_data
-        
-        context.user_data["product_map"] = product_map
-        
-        # Show list of product names as buttons, plus a Back button
-        buttons = [[name] for name in product_map.keys()]
-        buttons.append(["Back to Menu"])
-        keyboard = ReplyKeyboardMarkup(buttons, resize_keyboard=True)
-        await update.message.reply_text("Select a product:", reply_markup=keyboard)
-        return PRODUCT_SELECT
-    else:
-        await update.message.reply_text("Please choose a valid option.")
-        return CHOICE
+    # Store products in user_data with a mapping of display name -> product data
+    product_map = {}
+    for i, doc in enumerate(products_docs):
+        p_data = doc.to_dict()
+        p_name = p_data.get("productName") or f"Product {i+1}"
+        product_map[p_name] = p_data
+    
+    context.user_data["product_map"] = product_map
+    
+    # Show list of product names as buttons, plus a Back button
+    buttons = [[name] for name in product_map.keys()]
+    buttons.append(["Back to Menu"])
+    keyboard = ReplyKeyboardMarkup(buttons, resize_keyboard=True)
+    await update.message.reply_text("Select a product:", reply_markup=keyboard)
+    return PRODUCT_SELECT
 
 # ----------------- Handle product selection -----------------
 async def handle_product_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -169,7 +149,7 @@ async def handle_product_select(update: Update, context: ContextTypes.DEFAULT_TY
     
     if selected_name == "Back to Menu":
         keyboard = ReplyKeyboardMarkup(
-            [["User Details", "Product Details"]],
+            [["View My Products"]],
             resize_keyboard=True
         )
         await update.message.reply_text("Main Menu:", reply_markup=keyboard)
@@ -182,13 +162,13 @@ async def handle_product_select(update: Update, context: ContextTypes.DEFAULT_TY
         await update.message.reply_text("Please select a product from the list or 'Back to Menu'.")
         return PRODUCT_SELECT
     else:
-        # Format product details excluding large or system fields if any
+        # Format product details
         details = "\n".join([f"<b>{k}</b>: {v}" for k, v in product_data.items()])
         await update.message.reply_text(f"<b>{selected_name} Details:</b>\n{details}", parse_mode="HTML")
 
-    # Offer to go back
+    # Offer to go back to products or menu
     keyboard = ReplyKeyboardMarkup(
-        [["User Details", "Product Details"]],
+        [["View My Products"]],
         resize_keyboard=True
     )
     await update.message.reply_text("What would you like to see next?", reply_markup=keyboard)

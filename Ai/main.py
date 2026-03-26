@@ -293,33 +293,35 @@ async def recommend_route(req: RouteRequest):
     }
 
 if __name__ == "__main__":
-    import sys, json, asyncio
+    import uvicorn
+    uvicorn.run(app, port=8000, reload=True)
+    # import sys, json, asyncio
     
-    if len(sys.argv) > 1:
-        file_path = sys.argv[1]
-        print(f"Reading input from {file_path}...\n")
+    # if len(sys.argv) > 1:
+    #     file_path = sys.argv[1]
+    #     print(f"Reading input from {file_path}...\n")
         
-        try:
-            with open(file_path, "r", encoding="utf-8") as f:
-                data = json.load(f)
+    #     try:
+    #         with open(file_path, "r", encoding="utf-8") as f:
+    #             data = json.load(f)
                 
-            req = RouteRequest(**data)
+    #         req = RouteRequest(**data)
             
-            async def run_cli():
-                try:
-                    result = await recommend_route(req)
-                    print("--- OUTPUT ---")
-                    print(json.dumps(result, indent=2, ensure_ascii=False))
-                except HTTPException as e:
-                    print(f"API Error: {e.detail}")
-                except Exception as e:
-                    print(f"Error computing route: {e}")
+    #         async def run_cli():
+    #             try:
+    #                 result = await recommend_route(req)
+    #                 print("--- OUTPUT ---")
+    #                 print(json.dumps(result, indent=2, ensure_ascii=False))
+    #             except HTTPException as e:
+    #                 print(f"API Error: {e.detail}")
+    #             except Exception as e:
+    #                 print(f"Error computing route: {e}")
             
-            asyncio.run(run_cli())
+    #         asyncio.run(run_cli())
             
-        except FileNotFoundError:
-            print(f"Error: File '{file_path}' not found.")
-        except Exception as e:
-            print(f"Error parsing input: {e}")
-    else:
-        print("Usage: python main.py <path_to_json_file>\nExample: python main.py input.json")
+    #     except FileNotFoundError:
+    #         print(f"Error: File '{file_path}' not found.")
+    #     except Exception as e:
+    #         print(f"Error parsing input: {e}")
+    # else:
+    #     print("Usage: python main.py <path_to_json_file>\nExample: python main.py input.json")
