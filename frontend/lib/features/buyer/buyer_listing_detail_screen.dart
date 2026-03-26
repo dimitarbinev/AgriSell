@@ -281,94 +281,124 @@ class _BuyerListingDetailScreenState extends ConsumerState<BuyerListingDetailScr
                       ),
 
                       // Reserve Form
-                      const Text('Join the Group Buy',
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
-                      const SizedBox(height: 14),
-                      Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: glassDecoration(),
-                        child: Column(
-                          children: [
-                            TextField(
-                              controller: _quantityController,
-                              keyboardType: TextInputType.number,
-                              style: const TextStyle(color: AppTheme.textPrimary),
-                              decoration: const InputDecoration(
-                                labelText: 'Quantity (kg)',
-                                prefixIcon: Icon(Icons.scale, size: 20),
+                      if (listing.status == 'cancelled')
+                        Container(
+                          padding: const EdgeInsets.all(20),
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            color: Colors.red.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
+                            border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
+                          ),
+                          child: const Column(
+                            children: [
+                              Icon(Icons.cancel_outlined, color: Colors.red, size: 32),
+                              SizedBox(height: 12),
+                              Text(
+                                'This listing has been cancelled. Reservations are no longer accepted.',
+                                style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+                                textAlign: TextAlign.center,
                               ),
-                            ),
-                            const SizedBox(height: 14),
-                            TextField(
-                              controller: _depositController,
-                              keyboardType: TextInputType.number,
-                              style: const TextStyle(color: AppTheme.textPrimary),
-                              decoration: const InputDecoration(
-                                labelText: 'Deposit Amount (лв)',
-                                prefixIcon: Icon(Icons.payments_outlined, size: 20),
-                              ),
-                            ),
-                            const SizedBox(height: 20),
-                            SizedBox(
-                              width: double.infinity, height: 52,
-                              child:     Container(
-                                decoration: BoxDecoration(
-                                  gradient: AppTheme.primaryGradient,
-                                  borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
+                            ],
+                          ),
+                        )
+                      else ...[
+                        const Text('Join the Group Buy',
+                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
+                        const SizedBox(height: 14),
+                        Container(
+                          padding: const EdgeInsets.all(20),
+                          decoration: glassDecoration(),
+                          child: Column(
+                            children: [
+                              TextField(
+                                controller: _quantityController,
+                                keyboardType: TextInputType.number,
+                                style: const TextStyle(color: AppTheme.textPrimary),
+                                decoration: const InputDecoration(
+                                  labelText: 'Quantity (kg)',
+                                  prefixIcon: Icon(Icons.scale, size: 20),
                                 ),
-                                child: ElevatedButton.icon(
-                                  onPressed: () async {
-                                    if (_quantityController.text.isEmpty || _depositController.text.isEmpty) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(content: Text('Please fill all fields')),
-                                      );
-                                      return;
-                                    }
-
-                                    try {
-                                      final quantity = double.parse(_quantityController.text);
-                                      final deposit = double.parse(_depositController.text);
-
-                                      await ref.read(productServiceProvider).placeOrder(
-                                        listingId: listing.id,
-                                        sellerId: listing.sellerId,
-                                        productId: listing.productId,
-                                        quantity: quantity,
-                                        deposit: deposit,
-                                      );
-                                      
-                                      // Force refresh the listings to show updated progress
-                                      ref.invalidate(activeListingsProvider);
-
-                                      if (mounted) {
+                              ),
+                              const SizedBox(height: 14),
+                              TextField(
+                                controller: _depositController,
+                                keyboardType: TextInputType.number,
+                                style: const TextStyle(color: AppTheme.textPrimary),
+                                decoration: const InputDecoration(
+                                  labelText: 'Deposit Amount (лв)',
+                                  prefixIcon: Icon(Icons.payments_outlined, size: 20),
+                                ),
+                              ),
+                              const SizedBox(height: 20),
+                              SizedBox(
+                                width: double.infinity, height: 52,
+                                child:     Container(
+                                  decoration: BoxDecoration(
+                                    gradient: AppTheme.primaryGradient,
+                                    borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
+                                  ),
+                                  child: ElevatedButton.icon(
+                                    onPressed: () async {
+                                      if (_quantityController.text.isEmpty || _depositController.text.isEmpty) {
                                         ScaffoldMessenger.of(context).showSnackBar(
-                                          const SnackBar(content: Text('Reservation submitted successfully!')),
+                                          const SnackBar(content: Text('Please fill all fields')),
                                         );
-                                        // Clear controllers instead of navigating away
-                                        _quantityController.clear();
-                                        _depositController.clear();
-                                        FocusScope.of(context).unfocus();
+                                        return;
                                       }
-                                    } catch (e) {
-                                      if (mounted) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          SnackBar(content: Text('Error: $e')),
+
+                                      try {
+                                        final quantity = double.parse(_quantityController.text);
+                                        final deposit = double.parse(_depositController.text);
+
+                                        if (quantity <= 0 || deposit < 0) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            const SnackBar(content: Text('Quantity must be greater than 0')),
+                                          );
+                                          return;
+                                        }
+
+                                        await ref.read(productServiceProvider).placeOrder(
+                                          listingId: listing.id,
+                                          sellerId: listing.sellerId,
+                                          productId: listing.productId,
+                                          quantity: quantity,
+                                          deposit: deposit,
                                         );
+                                        
+                                        // Force refresh the listings to show updated progress
+                                        ref.invalidate(activeListingsProvider);
+
+                                        if (mounted) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            const SnackBar(content: Text('Reservation submitted successfully!')),
+                                          );
+                                          // Clear controllers instead of navigating away
+                                          _quantityController.clear();
+                                          _depositController.clear();
+                                          FocusScope.of(context).unfocus();
+                                        }
+                                      } catch (e) {
+                                        if (mounted) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(content: Text('Error: $e')),
+                                          );
+                                        }
                                       }
-                                    }
-                                  },
-                                  icon: const Icon(Icons.check_circle_outline),
-                                  label: const Text('Submit Reservation'),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.transparent,
-                                    shadowColor: Colors.transparent,
+                                    },
+                                    icon: const Icon(Icons.check_circle_outline),
+                                    label: const Text('Submit Reservation'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.transparent,
+                                      shadowColor: Colors.transparent,
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
+                      ],
                       const SizedBox(height: 16),
 
                       // AI Insight
