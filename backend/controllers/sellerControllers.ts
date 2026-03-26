@@ -76,3 +76,37 @@ export const getProducts = catch_async(async (req: Request, res: Response) => {
 
     return res.status(200).json(products);
 });
+
+export const getListings = catch_async(async (req: Request, res: Response) => {
+    const uid = req.user?.uid as string;
+    const snapshot = await db.collection("users").doc(uid).collection('products').get();
+    const listings: any[] = [];
+
+    for (const productDoc of snapshot.docs) {
+        const productData = productDoc.data();
+        const listingsSnapshot = await productDoc.ref.collection('listings').get();
+
+        for (const listingDoc of listingsSnapshot.docs) {
+            const listingData = listingDoc.data();
+            listings.push({
+                id: listingDoc.id,
+                sellerId: uid,
+                productId: productDoc.id,
+                productName: productData.productName,
+                productCategory: productData.category,
+                city: listingData.city || '',
+                date: listingData.date,
+                startTime: listingData.startTime,
+                endTime: listingData.endTime,
+                pricePerKg: productData.pricePerKg,
+                availableQuantity: productData.maxCapacity,
+                minThreshold: productData.minThreshold,
+                requestedQuantity: listingData.requestedQuantity || 0,
+                status: listingData.status,
+                productImageUrl: productData.image || null,
+            });
+        }
+    }
+
+    return res.status(200).json(listings);
+});
