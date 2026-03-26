@@ -77,9 +77,9 @@ class BuyerProfileScreen extends ConsumerWidget {
               const SizedBox(height: 28),
 
               // Menu items
-              _MenuItem(icon: Icons.receipt_long, label: 'Reservation History', onTap: () {}),
+
               _MenuItem(icon: Icons.favorite_outline, label: 'Saved Sellers', onTap: () {}),
-              _MenuItem(icon: Icons.settings_outlined, label: 'Settings', onTap: () {}),
+              _MenuItem(icon: Icons.settings_outlined, label: 'Settings', onTap: () => context.push('/seller/settings')),
               _MenuItem(
                 icon: Icons.storefront_outlined,
                 label: 'Switch to Seller',
@@ -98,7 +98,6 @@ class BuyerProfileScreen extends ConsumerWidget {
                   }
                 },
               ),
-              _MenuItem(icon: Icons.help_outline, label: 'Help & Support', onTap: () {}),
               _MenuItem(
                 icon: Icons.logout,
                 label: 'Sign Out',

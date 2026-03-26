@@ -321,10 +321,16 @@ final sellerProfileProvider =
   final reviewsSnap = await firestore
       .collection('reviews')
       .where('sellerId', isEqualTo: sellerId)
-      .orderBy('createdAt', descending: true)
       .get();
-  final reviews =
-      reviewsSnap.docs.map((d) => {'id': d.id, ...d.data()}).toList();
+  final reviews = reviewsSnap.docs
+      .map((d) => {'id': d.id, ...d.data()})
+      .toList()
+    ..sort((a, b) {
+      final aTime = a['createdAt'];
+      final bTime = b['createdAt'];
+      if (aTime == null || bTime == null) return 0;
+      return (bTime as dynamic).compareTo(aTime);
+    });
 
   return {'profile': profile, 'listings': listings, 'reviews': reviews};
 });
