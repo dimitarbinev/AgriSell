@@ -14,6 +14,7 @@ import 'features/seller/add_product_screen.dart';
 import 'features/seller/create_listing_screen.dart';
 import 'features/seller/seller_listing_detail_screen.dart';
 import 'features/seller/my_listings_screen.dart';
+import 'features/seller/my_products_screen.dart';
 import 'features/seller/route_planning_screen.dart';
 import 'features/seller/seller_profile_screen.dart';
 import 'features/seller/settings_screen.dart';
@@ -80,6 +81,10 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/seller/listings',
             builder: (context, state) => const MyListingsScreen(),
+          ),
+          GoRoute(
+            path: '/seller/products',
+            builder: (context, state) => const MyProductsScreen(),
           ),
           GoRoute(
             path: '/seller/route',

@@ -107,7 +107,7 @@ class SellerProfileScreen extends ConsumerWidget {
               const SizedBox(height: 28),
 
               // Menu items
-              _MenuItem(icon: Icons.inventory_2_outlined, label: 'My Products', onTap: () => context.go('/seller/listings')),
+              _MenuItem(icon: Icons.inventory_2_outlined, label: 'My Products', onTap: () => context.go('/seller/products')),
               _MenuItem(icon: Icons.settings_outlined, label: 'Settings', onTap: () => context.push('/seller/settings')),
               _MenuItem(
                 icon: Icons.shopping_bag_outlined,
