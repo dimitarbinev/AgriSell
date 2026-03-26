@@ -15,11 +15,13 @@ void main() async {
   runApp(const ProviderScope(child: AgroStreetMarketApp()));
 }
 
-class AgroStreetMarketApp extends StatelessWidget {
+class AgroStreetMarketApp extends ConsumerWidget {
   const AgroStreetMarketApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final router = ref.watch(routerProvider);
+    
     return MaterialApp.router(
       title: 'Agro Street Market',
       debugShowCheckedModeBanner: false,

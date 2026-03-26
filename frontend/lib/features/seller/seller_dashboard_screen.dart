@@ -10,6 +10,12 @@ class SellerDashboardScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _showAddMenu(context),
+        backgroundColor: AppTheme.primaryGreen,
+        icon: const Icon(Icons.add),
+        label: const Text('New Session'),
+      ),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(20),
@@ -325,3 +331,121 @@ final _sampleListings = [
     status: 'draft',
   ),
 ];
+
+void _showAddMenu(BuildContext context) {
+  showModalBottomSheet(
+    context: context,
+    backgroundColor: Colors.transparent,
+    builder: (context) => Container(
+      padding: const EdgeInsets.all(24),
+      decoration: const BoxDecoration(
+        color: AppTheme.cardSurface,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 24),
+          const Text(
+            'Create New',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+              color: AppTheme.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 24),
+          _AddMenuOption(
+            icon: Icons.add_circle_outline,
+            title: 'Add New Product',
+            subtitle: 'Register a new item to your inventory',
+            onTap: () {
+              Navigator.pop(context);
+              context.go('/seller/add-product');
+            },
+          ),
+          const SizedBox(height: 12),
+          _AddMenuOption(
+            icon: Icons.post_add_rounded,
+            title: 'Create New Listing',
+            subtitle: 'Start a new group buying session',
+            onTap: () {
+              Navigator.pop(context);
+              context.go('/seller/create-listing');
+            },
+          ),
+          const SizedBox(height: 24),
+        ],
+      ),
+    ),
+  );
+}
+
+class _AddMenuOption extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  const _AddMenuOption({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: glassDecoration(),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppTheme.accentGreen.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: AppTheme.accentGreen, size: 24),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.textPrimary,
+                    ),
+                  ),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: AppTheme.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right, color: AppTheme.textTertiary),
+          ],
+        ),
+      ),
+    );
+  }
+}
