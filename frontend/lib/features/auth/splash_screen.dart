@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../core/theme.dart';
 import '../../core/constants.dart';
 import '../../shared/providers/providers.dart';
@@ -48,23 +49,43 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
       final storage = ref.read(storageServiceProvider);
       
       if (user != null) {
-        // If logged in, wait for profile to load to determine role
-        dynamic profileAsync;
-        try {
-          profileAsync = await ref.read(userProfileProvider.future).timeout(const Duration(seconds: 5));
-        } catch (e) {
-          // Fallback if firestore profile fetch fails
-          if (mounted) context.go('/login');
-          return;
-        }
-
+        // User is authenticated — try to restore their session
         final lastRoute = await storage.getLastRoute();
+
+        // If we have a valid saved route, go there directly
         if (lastRoute != null && lastRoute != '/splash' && lastRoute != '/login' && lastRoute != '/') {
           if (mounted) context.go(lastRoute);
           return;
         }
-        
-        // Fallback to role-based dashboard if no specific last route
+
+        // No saved route — try to determine role from profile
+        dynamic profileAsync;
+        try {
+          profileAsync = await ref.read(userProfileProvider.future).timeout(const Duration(seconds: 5));
+        } catch (e) {
+          // Backend may be down — try Firestore directly for the role
+          try {
+            final doc = await FirebaseFirestore.instance
+                .collection('users')
+                .doc(user.uid)
+                .get()
+                .timeout(const Duration(seconds: 3));
+            final role = doc.data()?['role'] as String?;
+            if (mounted) {
+              if (role == 'seller') {
+                context.go('/seller/dashboard');
+              } else if (role == 'buyer') {
+                context.go('/buyer/home');
+              } else {
+                context.go('/login');
+              }
+            }
+          } catch (_) {
+            if (mounted) context.go('/login');
+          }
+          return;
+        }
+
         final role = profileAsync?['role'] as String?;
         if (mounted) {
           if (role == 'seller') {
@@ -72,7 +93,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
           } else if (role == 'buyer') {
             context.go('/buyer/home');
           } else {
-             context.go('/login');
+            context.go('/login');
           }
         }
       } else {
