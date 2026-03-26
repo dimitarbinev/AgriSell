@@ -33,26 +33,39 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     );
     _controller.forward();
 
-    Future.delayed(const Duration(seconds: 3), () async {
+    Future.delayed(const Duration(milliseconds: 2500), () async {
       if (!mounted) return;
       
       final authState = ref.read(authStateProvider);
       final storage = ref.read(storageServiceProvider);
       
       if (authState.value != null) {
+        // If logged in, wait for profile to load to determine role
+        dynamic profileAsync;
+        try {
+          profileAsync = await ref.read(userProfileProvider.future).timeout(const Duration(seconds: 5));
+        } catch (e) {
+          // Fallback if firestore profile fetch fails
+          context.go('/login');
+          return;
+        }
+
         final lastRoute = await storage.getLastRoute();
-        if (lastRoute != null && lastRoute != '/splash' && lastRoute != '/login') {
+        if (lastRoute != null && lastRoute != '/splash' && lastRoute != '/login' && lastRoute != '/') {
           if (mounted) context.go(lastRoute);
           return;
         }
         
         // Fallback to role-based dashboard if no specific last route
-        final role = ref.read(userRoleProvider);
+        final role = profileAsync?['role'] as String?;
         if (mounted) {
           if (role == 'seller') {
             context.go('/seller/dashboard');
-          } else {
+          } else if (role == 'buyer') {
             context.go('/buyer/home');
+          } else {
+            // No role found, maybe need onboarding?
+             context.go('/login');
           }
         }
       } else {

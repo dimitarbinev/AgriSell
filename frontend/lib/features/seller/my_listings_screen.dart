@@ -4,21 +4,27 @@ import '../../core/theme.dart';
 import '../../shared/models/models.dart';
 import '../../shared/widgets/listing_card.dart';
 
-class MyListingsScreen extends StatefulWidget {
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../shared/providers/providers.dart';
+
+class MyListingsScreen extends ConsumerStatefulWidget {
   const MyListingsScreen({super.key});
 
   @override
-  State<MyListingsScreen> createState() => _MyListingsScreenState();
+  ConsumerState<MyListingsScreen> createState() => _MyListingsScreenState();
 }
 
-class _MyListingsScreenState extends State<MyListingsScreen> {
+class _MyListingsScreenState extends ConsumerState<MyListingsScreen> {
   String? _filterStatus;
 
   @override
   Widget build(BuildContext context) {
-    final filtered = _filterStatus == null
-        ? _allListings
-        : _allListings.where((l) => l.status == _filterStatus).toList();
+    final user = ref.watch(authStateProvider).value;
+    if (user == null) {
+      return const Scaffold(body: Center(child: Text('Please log in')));
+    }
+
+    final listingsAsync = ref.watch(sellerListingsProvider(user.uid));
 
     return Scaffold(
       body: SafeArea(
@@ -58,7 +64,7 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
                   _FilterChip(label: 'All', isSelected: _filterStatus == null, onTap: () => setState(() => _filterStatus = null)),
                   _FilterChip(label: 'Active', isSelected: _filterStatus == 'active', onTap: () => setState(() => _filterStatus = 'active')),
                   _FilterChip(label: 'Threshold', isSelected: _filterStatus == 'threshold_reached', onTap: () => setState(() => _filterStatus = 'threshold_reached')),
-                  _FilterChip(label: 'GO', isSelected: _filterStatus == 'go_confirmed', onTap: () => setState(() => _filterStatus = 'go_confirmed')),
+                  _FilterChip(label: 'Confirmed', isSelected: _filterStatus == 'confirmed', onTap: () => setState(() => _filterStatus = 'confirmed')),
                   _FilterChip(label: 'Cancelled', isSelected: _filterStatus == 'cancelled', onTap: () => setState(() => _filterStatus = 'cancelled')),
                   _FilterChip(label: 'Completed', isSelected: _filterStatus == 'completed', onTap: () => setState(() => _filterStatus = 'completed')),
                 ],
@@ -66,14 +72,30 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
             ),
             const SizedBox(height: 16),
             Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                itemCount: filtered.length,
-                itemBuilder: (ctx, i) => ListingCard(
-                  listing: filtered[i],
-                  showSellerInfo: false,
-                  onTap: () => context.go('/seller/listing/${filtered[i].id}'),
-                ),
+              child: listingsAsync.when(
+                data: (listings) {
+                  final filtered = _filterStatus == null
+                      ? listings
+                      : listings.where((l) => l.status == _filterStatus).toList();
+
+                  if (filtered.isEmpty) {
+                    return const Center(
+                      child: Text('No listings found', style: TextStyle(color: AppTheme.textTertiary)),
+                    );
+                  }
+
+                  return ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    itemCount: filtered.length,
+                    itemBuilder: (ctx, i) => ListingCard(
+                      listing: filtered[i],
+                      showSellerInfo: false,
+                      onTap: () => context.go('/seller/listing/${filtered[i].id}'),
+                    ),
+                  );
+                },
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (err, _) => Center(child: Text('Error: $err', style: const TextStyle(color: Colors.red))),
               ),
             ),
           ],
@@ -110,11 +132,3 @@ class _FilterChip extends StatelessWidget {
     );
   }
 }
-
-final _allListings = [
-  Listing(id: '1', sellerId: 's1', productId: 'p1', productName: 'Fresh Tomatoes', productCategory: 'Vegetables', city: 'Sofia', date: DateTime.now().add(const Duration(days: 2)), startTime: '08:00', endTime: '14:00', pricePerKg: 3.50, availableQuantity: 200, minThreshold: 100, requestedQuantity: 75, status: 'active'),
-  Listing(id: '2', sellerId: 's1', productId: 'p2', productName: 'Organic Apples', productCategory: 'Fruits', city: 'Plovdiv', date: DateTime.now().add(const Duration(days: 3)), startTime: '09:00', endTime: '15:00', pricePerKg: 2.80, availableQuantity: 150, minThreshold: 80, requestedQuantity: 85, status: 'threshold_reached'),
-  Listing(id: '3', sellerId: 's1', productId: 'p3', productName: 'Sunflower Honey', productCategory: 'Honey', city: 'Varna', date: DateTime.now().add(const Duration(days: 5)), startTime: '10:00', endTime: '16:00', pricePerKg: 12.00, availableQuantity: 50, minThreshold: 30, requestedQuantity: 10, status: 'draft'),
-  Listing(id: '4', sellerId: 's1', productId: 'p1', productName: 'Fresh Tomatoes', productCategory: 'Vegetables', city: 'Burgas', date: DateTime.now().subtract(const Duration(days: 5)), startTime: '08:00', endTime: '13:00', pricePerKg: 3.20, availableQuantity: 180, minThreshold: 90, requestedQuantity: 120, status: 'completed'),
-  Listing(id: '5', sellerId: 's1', productId: 'p2', productName: 'Organic Apples', productCategory: 'Fruits', city: 'Ruse', date: DateTime.now().subtract(const Duration(days: 2)), startTime: '09:00', endTime: '14:00', pricePerKg: 3.00, availableQuantity: 100, minThreshold: 60, requestedQuantity: 25, status: 'cancelled'),
-];

@@ -1,52 +1,44 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../../core/theme.dart';
 import '../../shared/widgets/seller_card.dart';
 
-class BuyerMapScreen extends StatelessWidget {
+class BuyerMapScreen extends StatefulWidget {
   const BuyerMapScreen({super.key});
+
+  @override
+  State<BuyerMapScreen> createState() => _BuyerMapScreenState();
+}
+
+class _BuyerMapScreenState extends State<BuyerMapScreen> {
+  static const LatLng _center = LatLng(42.6977, 23.3219); // Sofia
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Stack(
         children: [
-          // Map placeholder (replace with GoogleMap widget)
-          Container(
-            color: const Color(0xFF1A2E2E),
-            child: const Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.map_rounded, size: 64, color: AppTheme.textTertiary),
-                  SizedBox(height: 12),
-                  Text('Google Maps', style: TextStyle(color: AppTheme.textTertiary, fontSize: 16)),
-                  SizedBox(height: 4),
-                  Text('Configure API key in AndroidManifest.xml',
-                      style: TextStyle(color: AppTheme.textTertiary, fontSize: 12)),
-                ],
-              ),
+          GoogleMap(
+            initialCameraPosition: const CameraPosition(
+              target: _center,
+              zoom: 6.5,
             ),
-          ),
-
-          // Simulated markers
-          ..._markers.map((m) => Positioned(
-            left: m.x,
-            top: m.y,
-            child: GestureDetector(
-              onTap: () => _showSellerSheet(context, m),
-              child: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: AppTheme.primaryGreen,
-                  border: Border.all(color: AppTheme.accentGreen, width: 2),
-                  boxShadow: [BoxShadow(color: AppTheme.primaryGreen.withValues(alpha: 0.4), blurRadius: 12)],
+            markers: _markers.map((m) {
+              return Marker(
+                markerId: MarkerId(m.sellerId),
+                position: m.position,
+                infoWindow: InfoWindow(
+                  title: m.sellerName,
+                  snippet: '${m.city} · ★ ${m.rating}',
+                  onTap: () => _showSellerSheet(context, m),
                 ),
-                child: const Icon(Icons.storefront, size: 18, color: Colors.white),
-              ),
-            ),
-          )),
+                icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+              );
+            }).toSet(),
+            myLocationEnabled: true,
+            zoomControlsEnabled: false,
+          ),
 
           // Top search bar
           Positioned(
@@ -147,13 +139,13 @@ class BuyerMapScreen extends StatelessWidget {
 }
 
 class _MapMarker {
-  final double x, y;
+  final LatLng position;
   final String sellerId, sellerName, city;
   final double rating;
   final List<String> products;
 
   const _MapMarker({
-    required this.x, required this.y,
+    required this.position,
     required this.sellerId, required this.sellerName,
     required this.city, required this.rating,
     required this.products,
@@ -161,8 +153,8 @@ class _MapMarker {
 }
 
 const _markers = [
-  _MapMarker(x: 100, y: 250, sellerId: 's1', sellerName: 'Ivan Petrov', city: 'Sofia', rating: 4.7, products: ['Tomatoes', 'Peppers']),
-  _MapMarker(x: 230, y: 380, sellerId: 's2', sellerName: 'Maria Georgieva', city: 'Plovdiv', rating: 4.5, products: ['Apples', 'Pears']),
-  _MapMarker(x: 300, y: 200, sellerId: 's3', sellerName: 'Todor Stoyanov', city: 'Varna', rating: 4.9, products: ['Honey']),
-  _MapMarker(x: 60, y: 450, sellerId: 's4', sellerName: 'Elena Nikolova', city: 'Burgas', rating: 4.3, products: ['Carrots', 'Potatoes']),
+  _MapMarker(position: LatLng(42.6977, 23.3219), sellerId: 's1', sellerName: 'Ivan Petrov', city: 'Sofia', rating: 4.7, products: ['Tomatoes', 'Peppers']),
+  _MapMarker(position: LatLng(42.1354, 24.7453), sellerId: 's2', sellerName: 'Maria Georgieva', city: 'Plovdiv', rating: 4.5, products: ['Apples', 'Pears']),
+  _MapMarker(position: LatLng(43.2141, 27.9147), sellerId: 's3', sellerName: 'Todor Stoyanov', city: 'Varna', rating: 4.9, products: ['Honey']),
+  _MapMarker(position: LatLng(42.5048, 27.4626), sellerId: 's4', sellerName: 'Elena Nikolova', city: 'Burgas', rating: 4.3, products: ['Carrots', 'Potatoes']),
 ];

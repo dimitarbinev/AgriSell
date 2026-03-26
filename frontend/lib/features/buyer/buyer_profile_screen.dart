@@ -27,16 +27,40 @@ class BuyerProfileScreen extends ConsumerWidget {
                 child: const Icon(Icons.person, color: Colors.white, size: 48),
               ),
               const SizedBox(height: 16),
-              const Text('Maria Ivanova',
-                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppTheme.textPrimary)),
-              const SizedBox(height: 4),
-              const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.location_on_outlined, size: 14, color: AppTheme.accentGreen),
-                  SizedBox(width: 4),
-                  Text('Sofia', style: TextStyle(fontSize: 14, color: AppTheme.textSecondary)),
-                ],
+              ref.watch(currentBuyerProvider).when(
+                data: (buyer) => Column(
+                  children: [
+                    Text(
+                      buyer?.name ?? 'Buyer',
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                        color: AppTheme.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(
+                          Icons.location_on_outlined,
+                          size: 14,
+                          color: AppTheme.accentGreen,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          buyer?.preferredCity ?? 'Unknown',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: AppTheme.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                loading: () => const CircularProgressIndicator(),
+                error: (_, __) => const Text('Error loading profile'),
               ),
               const SizedBox(height: 28),
 
@@ -62,7 +86,7 @@ class BuyerProfileScreen extends ConsumerWidget {
                 label: 'Switch to Seller',
                 onTap: () async {
                   try {
-                    await ref.read(userRoleProvider.notifier).switchRole('seller');
+                    await ref.read(authServiceProvider).switchRole('seller');
                     if (context.mounted) {
                       context.go('/seller/dashboard');
                     }

@@ -41,6 +41,7 @@ class StatusChip extends StatelessWidget {
       case AppConstants.statusThresholdReached:
         return _StatusConfig('Threshold Reached', AppTheme.statusThresholdReached);
       case AppConstants.statusGoConfirmed:
+      case 'confirmed':
         return _StatusConfig('GO Confirmed', AppTheme.statusGoConfirmed);
       case AppConstants.statusCancelled:
         return _StatusConfig('Cancelled', AppTheme.statusCancelled);

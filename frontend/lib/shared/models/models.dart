@@ -199,24 +199,77 @@ class Listing {
       sellerId: json['sellerId'] as String? ?? '',
       productId: json['productId'] as String? ?? '',
       productName: json['productName'] as String? ?? '',
-      productCategory: json['productCategory'] as String? ?? '',
+      productCategory: (json['productCategory'] ?? json['category']) as String? ?? '',
       city: json['city'] as String? ?? '',
-      date: (json['date'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      date: json['date'] is String 
+          ? DateTime.parse(json['date'] as String) 
+          : (json['date'] as Timestamp?)?.toDate() ?? DateTime.now(),
       startTime: json['startTime'] as String? ?? '',
       endTime: json['endTime'] as String? ?? '',
       pricePerKg: (json['pricePerKg'] as num?)?.toDouble() ?? 0.0,
       availableQuantity:
-          (json['availableQuantity'] as num?)?.toDouble() ?? 0.0,
+          (json['availableQuantity'] ?? json['maxCapacity'] ?? 0) is num
+              ? (json['availableQuantity'] ?? json['maxCapacity'] ?? 0).toDouble()
+              : 0.0,
       minThreshold: (json['minThreshold'] as num?)?.toDouble() ?? 0.0,
       requestedQuantity:
           (json['requestedQuantity'] as num?)?.toDouble() ?? 0.0,
       depositsTotal: (json['depositsTotal'] as num?)?.toDouble() ?? 0.0,
-      status: json['status'] as String? ?? 'draft',
+      status: json['status'] is int
+          ? _mapStatus(json['status'] as int)
+          : json['status'] as String? ?? 'active',
       goDecision: json['goDecision'] as bool?,
       sellerName: json['sellerName'] as String?,
       sellerPhotoUrl: json['sellerPhotoUrl'] as String?,
       sellerRating: (json['sellerRating'] as num?)?.toDouble(),
-      productImageUrl: json['productImageUrl'] as String?,
+      productImageUrl: (json['productImageUrl'] ?? json['image']) as String?,
+    );
+  }
+
+  static String _mapStatus(int status) {
+    switch (status) {
+      case 0:
+        return 'pending'; // Draft/Pending
+      case 1:
+        return 'active'; // Initial Active state
+      case 2:
+        return 'confirmed'; // Confirmed GO!
+      case 3:
+        return 'cancelled';
+      default:
+        return 'draft';
+    }
+  }
+
+  static Listing fromFirestore({
+    required Map<String, dynamic> productData,
+    required Map<String, dynamic> listingData,
+    required String listingId,
+    required String sellerId,
+    required String productId,
+  }) {
+    return Listing(
+      id: listingId,
+      sellerId: sellerId,
+      productId: productId,
+      productName: productData['productName'] as String? ?? '',
+      productCategory: productData['category'] as String? ?? '',
+      city: (listingData['city'] ?? productData['origin'] ?? productData['mainCity']) as String? ?? '',
+      date: listingData['date'] is String
+          ? DateTime.parse(listingData['date'] as String)
+          : (listingData['date'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      startTime: listingData['startTime'] as String? ?? '',
+      endTime: listingData['endTime'] as String? ?? '',
+      pricePerKg: (productData['pricePerKg'] as num?)?.toDouble() ?? 0.0,
+      availableQuantity: (productData['maxCapacity'] as num?)?.toDouble() ?? 0.0,
+      minThreshold: (productData['minThreshold'] as num?)?.toDouble() ?? 0.0,
+      requestedQuantity:
+          (listingData['requestedQuantity'] as num?)?.toDouble() ?? 0.0,
+      depositsTotal: (listingData['depositsTotal'] as num?)?.toDouble() ?? 0.0,
+      status: listingData['status'] is int
+          ? _mapStatus(listingData['status'] as int)
+          : listingData['status'] as String? ?? 'active',
+      productImageUrl: productData['image'] as String?,
     );
   }
 

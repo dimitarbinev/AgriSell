@@ -1,11 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import '../../shared/providers/map_provider.dart';
 import '../../core/theme.dart';
 
-class RoutePlanningScreen extends StatelessWidget {
+class RoutePlanningScreen extends ConsumerWidget {
   const RoutePlanningScreen({super.key});
 
+  static const LatLng _initialCenter = LatLng(42.6977, 23.3219); // Sofia
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final mapState = ref.watch(mapProvider);
+
     return Scaffold(
       body: SafeArea(
         child: Column(
@@ -27,38 +34,28 @@ class RoutePlanningScreen extends StatelessWidget {
                   color: AppTheme.cardSurface,
                   border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
                 ),
-                child: Stack(
-                  children: [
-                    const Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.map_rounded, size: 48, color: AppTheme.textTertiary),
-                          SizedBox(height: 8),
-                          Text('Map View', style: TextStyle(color: AppTheme.textTertiary)),
-                          Text('Google Maps loads here', style: TextStyle(color: AppTheme.textTertiary, fontSize: 12)),
-                        ],
-                      ),
-                    ),
-                    // Demand dots overlay simulation
-                    ..._demandDots.map((d) => Positioned(
-                      left: d.x,
-                      top: d.y,
-                      child: Container(
-                        width: d.size,
-                        height: d.size,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: AppTheme.accentGreen.withValues(alpha: 0.4),
-                          border: Border.all(color: AppTheme.accentGreen, width: 2),
-                        ),
-                        child: Center(
-                          child: Text('${d.quantity}',
-                              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.white)),
-                        ),
-                      ),
-                    )),
-                  ],
+                clipBehavior: Clip.antiAlias,
+                child: GoogleMap(
+                  initialCameraPosition: CameraPosition(
+                    target: _initialCenter,
+                    zoom: 7,
+                  ),
+                  markers: mapState.markers,
+                  polylines: mapState.polylines,
+                  myLocationEnabled: true,
+                  zoomControlsEnabled: false,
+                  mapType: MapType.normal,
+                  onMapCreated: (controller) {
+                    if (mapState.routeOptions.isEmpty) {
+                      ref.read(mapProvider.notifier).fetchRecommendedRoute(
+                        sellerLat: 42.6977,
+                        sellerLng: 23.3219,
+                        pricePerKg: 3.5,
+                        availableQty: 500,
+                        cities: _sampleCityData,
+                      );
+                    }
+                  },
                 ),
               ),
             ),
@@ -72,13 +69,24 @@ class RoutePlanningScreen extends StatelessWidget {
                   const Text('Ranked Stops',
                       style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
                   const SizedBox(height: 12),
-                  ..._rankedStops.asMap().entries.map((e) => _StopCard(
-                    rank: e.key + 1,
-                    city: e.value.city,
-                    demand: e.value.demand,
-                    distance: e.value.distance,
-                    profit: e.value.profit,
-                  )),
+                  if (mapState.isLoading)
+                    const Center(child: CircularProgressIndicator(color: AppTheme.primaryGreen))
+                  else if (mapState.routeOptions.isEmpty)
+                    const Center(child: Text('No routes found', style: TextStyle(color: AppTheme.textSecondary)))
+                  else
+                    ...mapState.routeOptions.first['ordered_stops'].asMap().entries.map((e) {
+                      final cityName = e.value;
+                      final cityData = _sampleCityData.firstWhere((c) => c['name'] == cityName);
+                      final routeInfo = mapState.routeOptions.first;
+                      
+                      return _StopCard(
+                        rank: e.key + 1,
+                        city: cityName,
+                        demand: (cityData['requested_qty'] as num).toInt(),
+                        distance: (routeInfo['total_distance_km'] as num).toInt(),
+                        profit: (routeInfo['estimated_profit_bgn'] as num).toDouble() / routeInfo['ordered_stops'].length,
+                      );
+                    }),
                 ],
               ),
             ),
@@ -139,29 +147,9 @@ class _StopCard extends StatelessWidget {
   }
 }
 
-class _DemandDot {
-  final double x, y, size;
-  final int quantity;
-  const _DemandDot(this.x, this.y, this.size, this.quantity);
-}
-
-const _demandDots = [
-  _DemandDot(80, 60, 40, 75),
-  _DemandDot(180, 100, 50, 85),
-  _DemandDot(120, 180, 30, 40),
-  _DemandDot(250, 70, 25, 20),
-];
-
-class _RankedStop {
-  final String city;
-  final int demand, distance;
-  final double profit;
-  const _RankedStop(this.city, this.demand, this.distance, this.profit);
-}
-
-const _rankedStops = [
-  _RankedStop('Plovdiv', 85, 145, 238),
-  _RankedStop('Sofia', 75, 32, 262),
-  _RankedStop('Stara Zagora', 40, 230, 112),
-  _RankedStop('Burgas', 20, 380, 56),
+const _sampleCityData = [
+  {'name': 'Plovdiv', 'lat': 42.1354, 'lng': 24.7453, 'requested_qty': 85},
+  {'name': 'Sofia', 'lat': 42.6977, 'lng': 23.3219, 'requested_qty': 75},
+  {'name': 'Stara Zagora', 'lat': 42.4258, 'lng': 25.6345, 'requested_qty': 40},
+  {'name': 'Burgas', 'lat': 42.5048, 'lng': 27.4626, 'requested_qty': 20},
 ];

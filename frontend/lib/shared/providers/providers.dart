@@ -7,9 +7,12 @@ import '../services/auth_service.dart';
 import '../services/product_service.dart';
 import '../services/storage_service.dart';
 
-final storageServiceProvider = Provider<StorageService>((ref) => StorageService());
-final authServiceProvider = Provider<AuthService>((ref) => AuthService(ref.read(storageServiceProvider)));
+// ─── Service Providers ───
+final authServiceProvider = Provider<AuthService>((ref) => AuthService());
 final productServiceProvider = Provider<ProductService>((ref) => ProductService());
+final storageServiceProvider = Provider<StorageService>((ref) {
+  return StorageService(ref.watch(firebaseStorageProvider));
+});
 
 // ─── Firebase Instance Providers ───
 final firebaseAuthProvider = Provider<FirebaseAuth>(
@@ -29,20 +32,23 @@ final authStateProvider = StreamProvider<User?>((ref) {
   return ref.watch(firebaseAuthProvider).authStateChanges();
 });
 
-// ─── User Role ───
-class UserRoleNotifier extends Notifier<String?> {
-  @override
-  String? build() => null;
+// ─── User Profile & Role (Reactive) ───
+final userProfileProvider = StreamProvider<Map<String, dynamic>?>((ref) {
+  final user = ref.watch(authStateProvider).value;
+  if (user == null) return Stream.value(null);
 
-  void setRole(String? role) => state = role;
+  return ref
+      .watch(firestoreProvider)
+      .collection('users')
+      .doc(user.uid)
+      .snapshots()
+      .map((doc) => doc.exists ? doc.data() : null);
+});
 
-  Future<void> switchRole(String newRole) async {
-    await ref.read(authServiceProvider).switchRole(newRole);
-    state = newRole;
-  }
-}
-
-final userRoleProvider = NotifierProvider<UserRoleNotifier, String?>(UserRoleNotifier.new);
+final userRoleProvider = Provider<String?>((ref) {
+  final profile = ref.watch(userProfileProvider).value;
+  return profile?['role'] as String?;
+});
 
 // ─── Registration Data ───
 class RegistrationDataNotifier extends Notifier<Map<String, String>> {
@@ -56,75 +62,130 @@ class RegistrationDataNotifier extends Notifier<Map<String, String>> {
   void clear() => state = {};
 }
 
-final registrationDataProvider = NotifierProvider<RegistrationDataNotifier, Map<String, String>>(RegistrationDataNotifier.new);
+final registrationDataProvider =
+    NotifierProvider<RegistrationDataNotifier, Map<String, String>>(
+        RegistrationDataNotifier.new);
 
 // ─── Current Seller Profile ───
-final currentSellerProvider = FutureProvider<Seller?>((ref) {
-  final authState = ref.watch(authStateProvider);
-  return authState.when(
-    data: (user) async {
-      if (user == null) return null;
-      final doc =
-          await ref
-              .read(firestoreProvider)
-              .collection('sellers')
-              .doc(user.uid)
-              .get();
-      if (!doc.exists) return null;
-      return Seller.fromJson(doc.data()!, doc.id);
-    },
-    loading: () => null,
-    error: (_, _) => null,
-  );
+final reactiveSellerProvider = StreamProvider<Seller?>((ref) {
+  final user = ref.watch(authStateProvider).value;
+  if (user == null) return Stream.value(null);
+
+  return ref
+      .watch(firestoreProvider)
+      .collection('sellers')
+      .doc(user.uid)
+      .snapshots()
+      .map((doc) {
+    if (!doc.exists) {
+      // Fallback to Auth name if Firestore doc doesn't exist yet
+      return Seller(
+        id: user.uid,
+        name: user.displayName ?? '',
+        mainCity: '',
+        phone: '',
+        email: user.email ?? '',
+        createdAt: DateTime.now(),
+      );
+    }
+    return Seller.fromJson(doc.data()!, doc.id);
+  });
 });
 
 // ─── Current Buyer Profile ───
-final currentBuyerProvider = FutureProvider<Buyer?>((ref) {
-  final authState = ref.watch(authStateProvider);
-  return authState.when(
-    data: (user) async {
-      if (user == null) return null;
-      final doc =
-          await ref
-              .read(firestoreProvider)
-              .collection('buyers')
-              .doc(user.uid)
-              .get();
-      if (!doc.exists) return null;
-      return Buyer.fromJson(doc.data()!, doc.id);
-    },
-    loading: () => null,
-    error: (_, _) => null,
-  );
-});
+final currentBuyerProvider = StreamProvider<Buyer?>((ref) {
+  final user = ref.watch(authStateProvider).value;
+  if (user == null) return Stream.value(null);
 
-// ─── All Active Listings ───
-final activeListingsProvider = StreamProvider<List<Listing>>((ref) {
   return ref
       .watch(firestoreProvider)
-      .collection('listings')
-      .where('status', whereIn: ['active', 'threshold_reached'])
+      .collection('buyers')
+      .doc(user.uid)
       .snapshots()
-      .map(
-        (snap) =>
-            snap.docs.map((d) => Listing.fromJson(d.data(), d.id)).toList(),
+      .map((doc) {
+    if (!doc.exists) {
+      // Fallback to Auth name if Firestore doc doesn't exist yet
+      return Buyer(
+        id: user.uid,
+        name: user.displayName ?? '',
+        preferredCity: '',
+        email: user.email ?? '',
+        createdAt: DateTime.now(),
       );
+    }
+    return Buyer.fromJson(doc.data()!, doc.id);
+  });
+});
+
+// ─── All Active Listings (Manual Join to avoid Collection Group index) ───
+final activeListingsProvider = StreamProvider<List<Listing>>((ref) {
+  final firestore = ref.watch(firestoreProvider);
+
+  return firestore.collection('users').snapshots().asyncMap((userSnap) async {
+    final sellers = userSnap.docs.where((d) => d.data()['role'] == 'seller');
+    final List<Listing> allConfirmedListings = [];
+
+    for (final sellerDoc in sellers) {
+      final productSnap = await firestore
+          .collection('users')
+          .doc(sellerDoc.id)
+          .collection('products')
+          .get();
+
+      for (final productDoc in productSnap.docs) {
+        final productData = productDoc.data();
+        final listingsSnap = await productDoc.reference.collection('listings').get();
+
+        for (final listingDoc in listingsSnap.docs) {
+          final listingData = listingDoc.data();
+          // Filter for only 'confirmed' sessions (status 1 in enum)
+          final status = listingData['status'];
+          if (status == 1 || status == 'active' || status == 'confirmed') {
+            allConfirmedListings.add(Listing.fromFirestore(
+              productData: productData,
+              listingData: listingData,
+              listingId: listingDoc.id,
+              sellerId: sellerDoc.id,
+              productId: productDoc.id,
+            ));
+          }
+        }
+      }
+    }
+
+    return allConfirmedListings;
+  });
 });
 
 // ─── Seller's Listings ───
-final sellerListingsProvider = StreamProvider.family<List<Listing>, String>((
-  ref,
-  sellerId,
-) {
-  return ref
-      .watch(firestoreProvider)
-      .collection('listings')
-      .where('sellerId', isEqualTo: sellerId)
+final sellerListingsProvider =
+    StreamProvider.family<List<Listing>, String>((ref, sellerId) {
+  final firestore = ref.watch(firestoreProvider);
+
+  return firestore
+      .collection('users')
+      .doc(sellerId)
+      .collection('products')
       .snapshots()
-      .map(
-        (snap) =>
-            snap.docs.map((d) => Listing.fromJson(d.data(), d.id)).toList(),
-      );
+      .asyncMap((productSnap) async {
+    final List<Listing> sellerListings = [];
+
+    for (final productDoc in productSnap.docs) {
+      final productData = productDoc.data();
+      final listingsSnap = await productDoc.reference.collection('listings').get();
+
+      for (final listingDoc in listingsSnap.docs) {
+        sellerListings.add(Listing.fromFirestore(
+          productData: productData,
+          listingData: listingDoc.data(),
+          listingId: listingDoc.id,
+          sellerId: sellerId,
+          productId: productDoc.id,
+        ));
+      }
+    }
+    return sellerListings;
+  });
 });
 
 // ─── Seller's Products ───

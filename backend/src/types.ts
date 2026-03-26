@@ -9,9 +9,10 @@ declare global {
 }
 
 export enum Status{
-  pending,
-  confirmed,
-  cancelled
+  pending,      // 0
+  active,       // 1
+  go_confirmed, // 2
+  cancelled     // 3
 }
 
 export interface Product {
@@ -22,6 +23,7 @@ export interface Product {
   origin: string;
   image?: string;
   pricePerKg: number;
+  availableQuantity: number;
   season?: string;
   sellerId: string;
   createdAt: Date;

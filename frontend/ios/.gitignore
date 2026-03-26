@@ -32,3 +32,9 @@ Runner/GeneratedPluginRegistrant.*
 !default.mode2v3
 !default.pbxuser
 !default.perspectivev3
+
+# API Key Secrets
+Flutter/secrets.xcconfig
+Runner/secrets.xcconfig
+secrets.xcconfig
+Flutter/Runner/Secrets.xcconfig

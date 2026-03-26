@@ -12,9 +12,10 @@ class ProductService {
     required String productName,
     required double minThreshold,
     required double maxCapacity,
+    required double availableQuantity,
     required String category,
     required String origin,
-    required String image,
+    String? image,
     required double pricePerKg,
     required String season,
   }) async {
@@ -35,6 +36,7 @@ class ProductService {
       'productName': productName,
       'minThreshold': minThreshold,
       'maxCapacity': maxCapacity,
+      'availableQuantity': availableQuantity,
       'category': category,
       'origin': origin,
       'image': image,
@@ -125,6 +127,41 @@ class ProductService {
     if (response.statusCode != 200) {
       final result = jsonDecode(response.body);
       throw Exception(result['message'] ?? 'Failed to confirm listing');
+    }
+  }
+
+  Future<void> updateListingStatus({
+    required String productId,
+    required String listingId,
+    required int status,
+  }) async {
+    final user = _auth.currentUser;
+    if (user == null) throw Exception('No authenticated user found');
+
+    final idToken = await user.getIdToken();
+    if (idToken == null) throw Exception('Failed to retrieve authentication token');
+
+    final cleanBaseUrl = _baseUrl.endsWith('/') ? _baseUrl.substring(0, _baseUrl.length - 1) : _baseUrl;
+    final url = Uri.parse('$cleanBaseUrl/seller/updateStatus');
+
+    final payload = {
+      'productId': productId,
+      'listingId': listingId,
+      'status': status,
+    };
+
+    final response = await http.post(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $idToken',
+      },
+      body: jsonEncode(payload),
+    );
+
+    if (response.statusCode != 200) {
+      final result = jsonDecode(response.body);
+      throw Exception(result['message'] ?? 'Failed to update listing status');
     }
   }
 }

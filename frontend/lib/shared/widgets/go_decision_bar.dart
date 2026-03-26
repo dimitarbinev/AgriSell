@@ -30,6 +30,7 @@ class GoDecisionBar extends StatelessWidget {
         child: Row(
           children: [
             Expanded(
+              flex: 2,
               child: _DecisionButton(
                 label: 'CANCEL',
                 icon: Icons.close_rounded,
@@ -47,7 +48,7 @@ class GoDecisionBar extends StatelessWidget {
             ),
             const SizedBox(width: 16),
             Expanded(
-              flex: 2,
+              flex: 1,
               child: _DecisionButton(
                 label: 'GO',
                 icon: Icons.check_rounded,
@@ -131,9 +132,9 @@ class _DecisionButton extends StatelessWidget {
         label: Text(
           label,
           style: const TextStyle(
-            fontSize: 18,
+            fontSize: 15,
             fontWeight: FontWeight.w800,
-            letterSpacing: 1.2,
+            letterSpacing: 1.0,
           ),
         ),
         style: ElevatedButton.styleFrom(

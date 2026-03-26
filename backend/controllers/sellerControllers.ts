@@ -7,8 +7,14 @@ import { Product, Status } from "../src/types.js";
 export const productListing = catch_async(async (req: Request, res: Response) => {
     const productData: Partial<Product> = req.body;
 
-    if(!productData.productName || !productData.minThreshold || !productData.maxCapacity || !productData.category || !productData.origin || !productData.image || !productData.pricePerKg) {
-        return res.status(400).json({message: "All fields are required"})
+    const requiredFields = ['productName', 'minThreshold', 'maxCapacity', 'category', 'origin', 'pricePerKg', 'availableQuantity'];
+    const missingFields = requiredFields.filter(field => !productData[field as keyof Product]);
+
+    if (missingFields.length > 0) {
+        console.log("Missing fields in product listing:", missingFields);
+        return res.status(400).json({
+            message: `Missing fields: ${missingFields.join(', ')}`
+        });
     }
 
     const uid = req.user?.uid as string;
@@ -31,6 +37,7 @@ export const productListing = catch_async(async (req: Request, res: Response) =>
         image: productData.image,
         origin: productData.origin,
         pricePerKg: productData.pricePerKg,
+        availableQuantity: productData.availableQuantity,
         season: productData.season,
         sellerId: uid,
         createdAt: new Date()
@@ -62,7 +69,7 @@ export const listingConfirmation = catch_async(async (req: Request, res: Respons
         date,
         startTime,
         endTime,
-        status: Status.confirmed,
+        status: Status.active,
         updatedAt: new Date()
     })
 
@@ -109,4 +116,31 @@ export const getListings = catch_async(async (req: Request, res: Response) => {
     }
 
     return res.status(200).json(listings);
+});
+
+export const updateListingStatus = catch_async(async (req: Request, res: Response) => {
+    const { productId, listingId, status } = req.body;
+
+    if (!productId || !listingId || status === undefined) {
+        return res.status(400).json({ message: "Invalid request: productId, listingId, and status are required" });
+    }
+
+    const uid = req.user?.uid as string;
+    const userRef = await db.collection("users").doc(uid).get();
+
+    if (!userRef.exists) {
+        return res.status(404).json({ message: "User not found" });
+    }
+
+    const sellerDoc = await db.collection("users").doc(uid).collection('products').doc(productId).collection("listings").doc(listingId).get();
+    if (!sellerDoc.exists) {
+        return res.status(404).json({ message: "Listing not found" });
+    }
+
+    await db.collection("users").doc(uid).collection('products').doc(productId).collection("listings").doc(listingId).update({
+        status: Number(status),
+        updatedAt: new Date()
+    });
+
+    return res.status(200).json({ message: "Listing status updated successfully" });
 });

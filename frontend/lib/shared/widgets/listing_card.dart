@@ -111,26 +111,47 @@ class ListingCard extends StatelessWidget {
                               listing.city,
                               style: const TextStyle(
                                 fontSize: 13,
-                                color: AppTheme.textSecondary,
+                                color: AppTheme.accentGreen,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
-                            const SizedBox(width: 12),
+                            const Spacer(),
                             Container(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 8,
                                 vertical: 2,
                               ),
                               decoration: BoxDecoration(
-                                color: AppTheme.primaryGreen.withValues(alpha: 0.15),
+                                color: AppTheme.primaryGreen.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(6),
                               ),
-                              child: Text(
-                                DateFormat('MMM d').format(listing.date),
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppTheme.accentGreen,
-                                ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.calendar_today_outlined, 
+                                    size: 10, color: AppTheme.accentGreen.withValues(alpha: 0.8)),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    DateFormat('MMM d').format(listing.date),
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppTheme.accentGreen,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Icon(Icons.access_time_outlined, 
+                                    size: 10, color: AppTheme.accentGreen.withValues(alpha: 0.8)),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '${listing.startTime} - ${listing.endTime}',
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppTheme.accentGreen,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ],
