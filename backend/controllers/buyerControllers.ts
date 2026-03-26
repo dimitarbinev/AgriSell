@@ -62,67 +62,101 @@ export const placeOrder = catch_async(async (req: Request, res: Response) => {
     const { listingId, quantity, deposit, sellerId, productId } = req.body;
     console.log(`[placeOrder] Request: listingId=${listingId}, qty=${quantity}, sellerId=${sellerId}, productId=${productId}`);
 
-    if (!listingId || !quantity || !deposit || !sellerId || !productId) {
-        return res.status(400).json({ message: "Invalid request: missing fields" })
+    if (!listingId || quantity === undefined || deposit === undefined || !sellerId || !productId) {
+        return res.status(400).json({ message: "Invalid request: missing fields" });
+    }
+
+    if (Number(quantity) <= 0 || Number(deposit) < 0) {
+        return res.status(400).json({ message: "Quantity must be greater than 0" });
     }
 
     const uid = req.user?.uid as string;
-    const userRef = await db.collection("users").doc(uid).get();
+    const userDoc = await db.collection("users").doc(uid).get();
 
-    if (!userRef.exists) {
+    if (!userDoc.exists) {
         return res.status(404).json({ message: "User not found" });
     }
 
-    const userRole = userRef.data()?.role;
-    if (userRole !== "buyer") {
+    if (userDoc.data()?.role !== "buyer") {
         return res.status(403).json({ message: "User is not a buyer" });
     }
 
-    // 1. Create order for the buyer (private)
-    const orderData = {
-        listingId,
-        sellerId,
-        productId,
-        quantity: Number(quantity),
-        deposit: Number(deposit),
-        status: 1,
-        createdAt: new Date()
-    };
-    console.log(`[placeOrder] Saving order to buyer ${uid}:`, orderData);
-    await db.collection("users").doc(uid).collection('orders').add(orderData);
+    const buyerName = userDoc.data()?.name || "Anonymous";
 
-    // 2. Create reservation (shared/public visibility for the listing)
-    const buyerName = userRef.data()?.name || "Anonymous";
-    console.log(`[placeOrder] Creating shared reservation for listingId: "${listingId}"`);
-    const reservationData = {
-        listingId,
-        buyerId: uid,
-        buyerName,
-        quantity: Number(quantity),
-        deposit: Number(deposit),
-        status: 'pending',
-        createdAt: new Date(),
-        attendanceDate: new Date() // Added for model compatibility
-    };
-    console.log(`[placeOrder] Reservation data object:`, JSON.stringify(reservationData));
-    await db.collection("reservations").add(reservationData);
-
-    // 3. Increment listing progress
+    // Refs for atomic transaction
     const listingRef = db.collection("users").doc(sellerId)
         .collection('products').doc(productId)
         .collection('listings').doc(listingId);
+    
+    const productRef = db.collection("users").doc(sellerId)
+        .collection('products').doc(productId);
 
-    console.log(`[placeOrder] Incrementing requestedQuantity by ${quantity} for listing ${listingId}`);
-    await listingRef.update({
-        requestedQuantity: admin.firestore.FieldValue.increment(Number(quantity)),
-        updatedAt: new Date()
-    });
+    try {
+        await db.runTransaction(async (transaction) => {
+            const listingDoc = await transaction.get(listingRef);
+            const productDoc = await transaction.get(productRef);
 
-    const updatedDoc = await listingRef.get();
-    console.log(`[placeOrder] VERIFY: New requestedQuantity in DB for ${listingId} is: ${updatedDoc.data()?.requestedQuantity}`);
+            if (!listingDoc.exists || !productDoc.exists) {
+                throw new Error("Listing or Product not found");
+            }
 
-    return res.status(200).json({ message: "Order placed successfully" })
-})
+            const listingData = listingDoc.data()!;
+            const productData = productDoc.data()!;
+            
+            const currentQty = Number(listingData.requestedQuantity || 0);
+            const requestedQty = Number(quantity);
+            const newTotalQty = currentQty + requestedQty;
+            const maxCapacity = Number(productData.maxCapacity || 0);
+            const minThreshold = Number(productData.minThreshold || 0);
+
+            // 1. Capacity Check
+            if (newTotalQty > maxCapacity) {
+                throw new Error(`Insufficient capacity. Only ${Math.max(0, maxCapacity - currentQty)} kg remaining.`);
+            }
+
+            // 2. Prepare Updates
+            const updates: any = {
+                requestedQuantity: admin.firestore.FieldValue.increment(requestedQty),
+                updatedAt: new Date()
+            };
+
+            // 3. Auto-Confirm Logic
+            // Status 2 = 'confirmed' per frontend models.dart
+            if (newTotalQty >= minThreshold && listingData.status !== 2) {
+                updates.status = 2;
+                console.log(`[placeOrder] Listing ${listingId} reached threshold (${newTotalQty}/${minThreshold}). Auto-confirming!`);
+            }
+
+            transaction.update(listingRef, updates);
+
+            // 4. Create Order record (Private)
+            const orderRef = db.collection("users").doc(uid).collection('orders').doc();
+            transaction.set(orderRef, {
+                listingId, sellerId, productId,
+                quantity: requestedQty,
+                deposit: Number(deposit),
+                status: 1,
+                createdAt: new Date()
+            });
+
+            // 5. Create Reservation record (Public)
+            const resRef = db.collection("reservations").doc();
+            transaction.set(resRef, {
+                listingId, buyerId: uid, buyerName,
+                quantity: requestedQty,
+                deposit: Number(deposit),
+                status: 'pending',
+                createdAt: new Date(),
+                attendanceDate: new Date()
+            });
+        });
+
+        return res.status(200).json({ message: "Order placed successfully" });
+    } catch (error: any) {
+        console.error(`[placeOrder] Transaction failed:`, error.message);
+        return res.status(400).json({ message: error.message });
+    }
+});
 
 export const getSellerProfile = catch_async(async (req: Request, res: Response) => {
     const { id } = req.params as any;
