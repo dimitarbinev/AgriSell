@@ -50,28 +50,30 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
     final name = _nameController.text.trim();
     final origin = _originController.text.trim();
     final priceStr = _priceController.text.trim();
+    final quantityStr = _quantityController.text.trim();
     final minThresholdStr = _minThresholdController.text.trim();
     final maxCapacityStr = _maxCapacityController.text.trim();
 
     if (name.isEmpty ||
         origin.isEmpty ||
         priceStr.isEmpty ||
+        quantityStr.isEmpty ||
         minThresholdStr.isEmpty ||
         maxCapacityStr.isEmpty ||
         _selectedCategory == null ||
-        _selectedSeason == null ||
-        _imageFile == null) {
+        _selectedSeason == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill in all fields including the photo')),
+        const SnackBar(content: Text('Please fill in all fields')),
       );
       return;
     }
 
     final price = double.tryParse(priceStr);
+    final quantity = double.tryParse(quantityStr);
     final minThreshold = double.tryParse(minThresholdStr);
     final maxCapacity = double.tryParse(maxCapacityStr);
 
-    if (price == null || minThreshold == null || maxCapacity == null) {
+    if (price == null || quantity == null || minThreshold == null || maxCapacity == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please enter valid numeric values')),
       );
@@ -84,13 +86,15 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
       final user = ref.read(authStateProvider).value;
       if (user == null) throw Exception('No authenticated user');
 
-      // Upload image first
-      final imageUrl = await ref.read(storageServiceProvider).uploadProductImage(_imageFile!, user.uid);
+      // Image upload disabled as requested. 
+      // Using a placeholder URL to satisfy backend requirement.
+      const String imageUrl = 'https://images.unsplash.com/photo-1523348837708-15d4a09cfac2?q=80&w=500&auto=format&fit=crop';
 
       await ref.read(productServiceProvider).addProduct(
             productName: name,
             minThreshold: minThreshold,
             maxCapacity: maxCapacity,
+            availableQuantity: quantity,
             category: _selectedCategory!,
             origin: origin,
             image: imageUrl,

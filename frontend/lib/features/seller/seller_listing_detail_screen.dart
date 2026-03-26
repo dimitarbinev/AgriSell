@@ -52,7 +52,7 @@ class SellerListingDetailScreen extends ConsumerWidget {
             ],
           ),
           body: SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -68,9 +68,17 @@ class SellerListingDetailScreen extends ConsumerWidget {
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
                           color: AppTheme.cardSurfaceLight,
+                          image: listing.productImageUrl != null
+                              ? DecorationImage(
+                                  image: NetworkImage(listing.productImageUrl!),
+                                  fit: BoxFit.cover,
+                                )
+                              : null,
                         ),
-                        child: const Icon(Icons.eco,
-                            color: AppTheme.accentGreen, size: 32),
+                        child: listing.productImageUrl == null
+                            ? const Icon(Icons.eco,
+                                color: AppTheme.accentGreen, size: 32)
+                            : null,
                       ),
                       const SizedBox(width: 16),
                       Expanded(
@@ -143,61 +151,104 @@ class SellerListingDetailScreen extends ConsumerWidget {
                               'Deposits: ${listing.depositsTotal.toStringAsFixed(2)} лв',
                               style: const TextStyle(
                                   fontSize: 13, color: AppTheme.textSecondary)),
-                          Text('${listing.startTime} - ${listing.endTime}',
-                              style: const TextStyle(
-                                  fontSize: 13, color: AppTheme.textSecondary)),
+
                         ],
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 15),
+                // Product Info Tiles (Now Full Width)
+                Container(
+                  padding: const EdgeInsets.all(18),
+                  decoration: glassDecoration(),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.category_outlined,
+                          size: 20, color: AppTheme.accentGreen),
+                      const SizedBox(width: 12),
+                      const Text('Category',
+                          style: TextStyle(
+                              fontSize: 14, color: AppTheme.textSecondary)),
+                      const Spacer(),
+                      Text(listing.productCategory,
+                          style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              color: AppTheme.textPrimary)),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(18),
+                  decoration: glassDecoration(),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.scale_outlined,
+                          size: 20, color: AppTheme.accentGreen),
+                      const SizedBox(width: 12),
+                      const Text('Min Threshold',
+                          style: TextStyle(
+                              fontSize: 14, color: AppTheme.textSecondary)),
+                      const Spacer(),
+                      Text('${listing.minThreshold.toStringAsFixed(0)} kg',
+                          style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              color: AppTheme.textPrimary)),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 15),
 
                 // Reservations (Using real data)
                 reservationsAsync.when(
                   data: (reservations) => Container(
-                    padding: const EdgeInsets.all(20),
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
                     decoration: glassDecoration(),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text('Reservations (${reservations.length})',
                             style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w800,
                                 color: AppTheme.textPrimary)),
-                        const SizedBox(height: 14),
+                        const SizedBox(height: 18),
                         if (reservations.isEmpty)
                           const Text('No reservations yet',
                               style: TextStyle(color: AppTheme.textTertiary)),
                         ...reservations.map((r) => Padding(
-                              padding: const EdgeInsets.only(bottom: 12),
+                              padding: const EdgeInsets.only(bottom: 16),
                               child: Row(
                                 children: [
                                   Container(
-                                    width: 40,
-                                    height: 40,
+                                    width: 48,
+                                    height: 48,
                                     decoration: BoxDecoration(
                                       shape: BoxShape.circle,
                                       color: AppTheme.primaryGreen
                                           .withValues(alpha: 0.15),
                                     ),
                                     child: const Icon(Icons.person,
-                                        size: 20, color: AppTheme.accentGreen),
+                                        size: 24, color: AppTheme.accentGreen),
                                   ),
-                                  const SizedBox(width: 12),
+                                  const SizedBox(width: 14),
                                   Expanded(
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
                                         Text(r.buyerName ?? 'Buyer',
                                             style: const TextStyle(
-                                                fontWeight: FontWeight.w600,
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.w700,
                                                 color: AppTheme.textPrimary)),
+                                        const SizedBox(height: 2),
                                         Text(
                                             '${r.quantity.toStringAsFixed(0)} kg · ${r.deposit.toStringAsFixed(2)} лв deposit',
                                             style: const TextStyle(
-                                                fontSize: 12,
+                                                fontSize: 14,
                                                 color: AppTheme.textSecondary)),
                                       ],
                                     ),
@@ -214,27 +265,7 @@ class SellerListingDetailScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 16),
 
-                // AI Price Suggestion
-                AIInsightCard(
-                  icon: Icons.trending_up,
-                  title: 'Price Insight',
-                  body:
-                      'Your price of ${listing.pricePerKg.toStringAsFixed(2)} лв/kg is optimized for the ${listing.city} region based on local demand.',
-                  confidenceLabel: 'High Confidence',
-                  confidenceValue: 0.85,
-                ),
-                const SizedBox(height: 12),
-
-                // AI Route Suggestion
-                AIInsightCard(
-                  icon: Icons.route,
-                  title: 'Route Suggestion',
-                  body:
-                      'Optimized stop in ${listing.city} for ${listing.requestedQuantity.toStringAsFixed(0)} kg is confirmed.\n\nExpected revenue: ${(listing.requestedQuantity * listing.pricePerKg).toStringAsFixed(2)} лв',
-                  confidenceLabel: 'High',
-                  confidenceValue: 0.9,
-                ),
-                const SizedBox(height: 100),
+                
               ],
             ),
           ),
