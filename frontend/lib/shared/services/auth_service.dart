@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'storage_service.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import '../models/models.dart';
@@ -9,6 +10,14 @@ class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final String _baseUrl = dotenv.env['BACKEND_URL'] ?? '';
+  final StorageService? _storageService;
+
+  AuthService([this._storageService]);
+
+  Future<void> signOut() async {
+    await _auth.signOut();
+    await _storageService?.clearSession();
+  }
 
 
   Future<Map<String, dynamic>> signIn(String email, String password) async {

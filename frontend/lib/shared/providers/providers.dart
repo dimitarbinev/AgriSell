@@ -5,9 +5,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/models.dart';
 import '../services/auth_service.dart';
 import '../services/product_service.dart';
+import '../services/storage_service.dart';
 
-// ─── Service Providers ───
-final authServiceProvider = Provider<AuthService>((ref) => AuthService());
+final storageServiceProvider = Provider<StorageService>((ref) => StorageService());
+final authServiceProvider = Provider<AuthService>((ref) => AuthService(ref.read(storageServiceProvider)));
 final productServiceProvider = Provider<ProductService>((ref) => ProductService());
 
 // ─── Firebase Instance Providers ───

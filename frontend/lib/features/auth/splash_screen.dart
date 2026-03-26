@@ -2,15 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme.dart';
 import '../../core/constants.dart';
+import '../../shared/providers/providers.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class SplashScreen extends StatefulWidget {
+class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
 
   @override
-  State<SplashScreen> createState() => _SplashScreenState();
+  ConsumerState<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen>
+class _SplashScreenState extends ConsumerState<SplashScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _fadeIn;
@@ -31,8 +33,31 @@ class _SplashScreenState extends State<SplashScreen>
     );
     _controller.forward();
 
-    Future.delayed(const Duration(seconds: 3), () {
-      if (mounted) context.go('/login');
+    Future.delayed(const Duration(seconds: 3), () async {
+      if (!mounted) return;
+      
+      final authState = ref.read(authStateProvider);
+      final storage = ref.read(storageServiceProvider);
+      
+      if (authState.value != null) {
+        final lastRoute = await storage.getLastRoute();
+        if (lastRoute != null && lastRoute != '/splash' && lastRoute != '/login') {
+          if (mounted) context.go(lastRoute);
+          return;
+        }
+        
+        // Fallback to role-based dashboard if no specific last route
+        final role = ref.read(userRoleProvider);
+        if (mounted) {
+          if (role == 'seller') {
+            context.go('/seller/dashboard');
+          } else {
+            context.go('/buyer/home');
+          }
+        }
+      } else {
+        context.go('/login');
+      }
     });
   }
 

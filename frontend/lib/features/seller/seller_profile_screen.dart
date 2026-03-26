@@ -91,7 +91,12 @@ class SellerProfileScreen extends ConsumerWidget {
                 icon: Icons.logout,
                 label: 'Sign Out',
                 isDestructive: true,
-                onTap: () => context.go('/login'),
+                onTap: () async {
+                  await ref.read(authServiceProvider).signOut();
+                  if (context.mounted) {
+                    context.go('/login');
+                  }
+                },
               ),
             ],
           ),
