@@ -28,39 +28,81 @@ class SellerProfileScreen extends ConsumerWidget {
                 child: const Icon(Icons.person, color: Colors.white, size: 48),
               ),
               const SizedBox(height: 16),
-              const Text('Ivan Petrov',
-                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppTheme.textPrimary)),
-              const SizedBox(height: 4),
-              const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.location_on_outlined, size: 14, color: AppTheme.accentGreen),
-                  SizedBox(width: 4),
-                  Text('Sofia', style: TextStyle(fontSize: 14, color: AppTheme.textSecondary)),
-                ],
-              ),
-              const SizedBox(height: 12),
-              const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  RatingStars(rating: 4.7, size: 20),
-                  SizedBox(width: 8),
-                  Text('4.7', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
-                  SizedBox(width: 4),
-                  Text('(23 reviews)', style: TextStyle(fontSize: 13, color: AppTheme.textSecondary)),
-                ],
-              ),
-              const SizedBox(height: 28),
+              ref.watch(reactiveSellerProvider).when(
+                data: (seller) => Column(
+                  children: [
+                    // Header Info
+                    Text(
+                      seller?.name ?? 'Seller',
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                        color: AppTheme.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.location_on_outlined, size: 14, color: AppTheme.accentGreen),
+                        const SizedBox(width: 4),
+                        Text(
+                          seller?.mainCity ?? 'Unknown',
+                          style: const TextStyle(fontSize: 14, color: AppTheme.textSecondary),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        RatingStars(rating: seller?.rating ?? 0.0, size: 20),
+                        const SizedBox(width: 8),
+                        Text(
+                          (seller?.rating ?? 0.0).toStringAsFixed(1),
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppTheme.textPrimary),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '(${seller?.totalReviews ?? 0} reviews)',
+                          style: const TextStyle(fontSize: 13, color: AppTheme.textSecondary),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 28),
 
-              // Stats
-              Row(
-                children: [
-                  Expanded(child: _StatCard(label: 'Completed', value: '47', icon: Icons.check_circle_outline)),
-                  const SizedBox(width: 12),
-                  Expanded(child: _StatCard(label: 'Cancel Rate', value: '4%', icon: Icons.cancel_outlined)),
-                  const SizedBox(width: 12),
-                  Expanded(child: _StatCard(label: 'Products', value: '8', icon: Icons.eco)),
-                ],
+                    // Stats
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _StatCard(
+                            label: 'Completed',
+                            value: '${seller?.completedOrders ?? 0}',
+                            icon: Icons.check_circle_outline,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _StatCard(
+                            label: 'Cancel Rate',
+                            value: '${((seller?.cancelRate ?? 0.0) * 100).toStringAsFixed(0)}%',
+                            icon: Icons.cancel_outlined,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        const Expanded(
+                          child: _StatCard(
+                            label: 'Products',
+                            value: '8',
+                            icon: Icons.eco,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                loading: () => const CircularProgressIndicator(),
+                error: (_, __) => const Text('Error loading profile'),
               ),
               const SizedBox(height: 28),
 

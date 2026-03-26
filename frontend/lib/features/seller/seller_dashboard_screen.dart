@@ -1,14 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme.dart';
 import '../../shared/widgets/listing_card.dart';
 import '../../shared/models/models.dart';
+import '../../shared/providers/providers.dart';
 
-class SellerDashboardScreen extends StatelessWidget {
+class SellerDashboardScreen extends ConsumerWidget {
   const SellerDashboardScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final user = ref.watch(authStateProvider).value;
+    if (user == null) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    final userId = user.uid;
+
     return Scaffold(
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showAddMenu(context),
@@ -35,23 +41,41 @@ class SellerDashboardScreen extends StatelessWidget {
                     child: const Icon(Icons.person, color: Colors.white, size: 24),
                   ),
                   const SizedBox(width: 14),
-                  const Expanded(
+                  Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
+                        const Text(
                           'Good Morning',
                           style: TextStyle(
                             fontSize: 13,
                             color: AppTheme.textSecondary,
                           ),
                         ),
-                        Text(
-                          'Ivan Petrov',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w800,
-                            color: AppTheme.textPrimary,
+                        ref.watch(reactiveSellerProvider).when(
+                          data: (seller) => Text(
+                            seller?.name ?? 'Seller',
+                            style: const TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w800,
+                              color: AppTheme.textPrimary,
+                            ),
+                          ),
+                          loading: () => const Text(
+                            '...',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w800,
+                              color: AppTheme.textPrimary,
+                            ),
+                          ),
+                          error: (_, __) => const Text(
+                            'Seller',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w800,
+                              color: AppTheme.textPrimary,
+                            ),
                           ),
                         ),
                       ],
@@ -121,17 +145,19 @@ class SellerDashboardScreen extends StatelessWidget {
               ),
               const SizedBox(height: 28),
 
-              // Recent Listings
-              const Text(
-                'Recent Activity',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: AppTheme.textPrimary,
+              // Recent Activity
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Recent Activity',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.textPrimary,
+                  ),
                 ),
               ),
               const SizedBox(height: 14),
-              // Sample listings
               ..._sampleListings.map(
                 (listing) => ListingCard(
                   listing: listing,
@@ -146,6 +172,59 @@ class SellerDashboardScreen extends StatelessWidget {
     );
   }
 }
+
+// Demo data
+final _sampleListings = [
+  Listing(
+    id: '1',
+    sellerId: 's1',
+    productId: 'p1',
+    productName: 'Pink Tomatoes (Balan)',
+    productCategory: 'Vegetables',
+    city: 'Balan',
+    date: DateTime.now().add(const Duration(days: 2)),
+    startTime: '08:00',
+    endTime: '12:00',
+    pricePerKg: 4.50,
+    availableQuantity: 150,
+    minThreshold: 80,
+    requestedQuantity: 55,
+    status: 'active',
+  ),
+  Listing(
+    id: '2',
+    sellerId: 's1',
+    productId: 'p2',
+    productName: 'Sweet Cherries',
+    productCategory: 'Fruits',
+    city: 'Balan',
+    date: DateTime.now().add(const Duration(days: 4)),
+    startTime: '09:00',
+    endTime: '14:00',
+    pricePerKg: 6.80,
+    availableQuantity: 80,
+    minThreshold: 40,
+    requestedQuantity: 42,
+    status: 'threshold_reached',
+  ),
+  Listing(
+    id: '3',
+    sellerId: 's1',
+    productId: 'p3',
+    productName: 'Spring Potatoes',
+    productCategory: 'Vegetables',
+    city: 'Balan',
+    date: DateTime.now().add(const Duration(days: 1)),
+    startTime: '08:00',
+    endTime: '11:00',
+    pricePerKg: 2.20,
+    availableQuantity: 300,
+    minThreshold: 150,
+    requestedQuantity: 180,
+    status: 'threshold_reached',
+    goDecision: true,
+  ),
+];
 
 class _NotifBell extends StatelessWidget {
   final VoidCallback onTap;

@@ -59,43 +59,54 @@ class RegistrationDataNotifier extends Notifier<Map<String, String>> {
 final registrationDataProvider = NotifierProvider<RegistrationDataNotifier, Map<String, String>>(RegistrationDataNotifier.new);
 
 // ─── Current Seller Profile ───
-final currentSellerProvider = FutureProvider<Seller?>((ref) {
-  final authState = ref.watch(authStateProvider);
-  return authState.when(
-    data: (user) async {
-      if (user == null) return null;
-      final doc =
-          await ref
-              .read(firestoreProvider)
-              .collection('sellers')
-              .doc(user.uid)
-              .get();
-      if (!doc.exists) return null;
-      return Seller.fromJson(doc.data()!, doc.id);
-    },
-    loading: () => null,
-    error: (_, _) => null,
-  );
+final reactiveSellerProvider = StreamProvider<Seller?>((ref) {
+  final user = ref.watch(authStateProvider).value;
+  if (user == null) return Stream.value(null);
+
+  return ref
+      .watch(firestoreProvider)
+      .collection('sellers')
+      .doc(user.uid)
+      .snapshots()
+      .map((doc) {
+    if (!doc.exists) {
+      // Fallback to Auth name if Firestore doc doesn't exist yet
+      return Seller(
+        id: user.uid,
+        name: user.displayName ?? '',
+        mainCity: '',
+        phone: '',
+        email: user.email ?? '',
+        createdAt: DateTime.now(),
+      );
+    }
+    return Seller.fromJson(doc.data()!, doc.id);
+  });
 });
 
 // ─── Current Buyer Profile ───
-final currentBuyerProvider = FutureProvider<Buyer?>((ref) {
-  final authState = ref.watch(authStateProvider);
-  return authState.when(
-    data: (user) async {
-      if (user == null) return null;
-      final doc =
-          await ref
-              .read(firestoreProvider)
-              .collection('buyers')
-              .doc(user.uid)
-              .get();
-      if (!doc.exists) return null;
-      return Buyer.fromJson(doc.data()!, doc.id);
-    },
-    loading: () => null,
-    error: (_, _) => null,
-  );
+final currentBuyerProvider = StreamProvider<Buyer?>((ref) {
+  final user = ref.watch(authStateProvider).value;
+  if (user == null) return Stream.value(null);
+
+  return ref
+      .watch(firestoreProvider)
+      .collection('buyers')
+      .doc(user.uid)
+      .snapshots()
+      .map((doc) {
+    if (!doc.exists) {
+      // Fallback to Auth name if Firestore doc doesn't exist yet
+      return Buyer(
+        id: user.uid,
+        name: user.displayName ?? '',
+        preferredCity: '',
+        email: user.email ?? '',
+        createdAt: DateTime.now(),
+      );
+    }
+    return Buyer.fromJson(doc.data()!, doc.id);
+  });
 });
 
 // ─── All Active Listings ───

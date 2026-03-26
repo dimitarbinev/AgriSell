@@ -162,18 +162,7 @@ class _CreateListingScreenState extends ConsumerState<CreateListingScreen> {
               ),
               const SizedBox(height: 16),
 
-              // Price (Pre-filled but read-only)
-              TextField(
-                controller: _priceController,
-                readOnly: true,
-                style: const TextStyle(color: AppTheme.textPrimary),
-                decoration: const InputDecoration(
-                  labelText: 'Price per kg (from product)',
-                  prefixIcon: Icon(Icons.payments_outlined, size: 20),
-                  prefixText: 'лв ',
-                ),
-              ),
-              const SizedBox(height: 16),
+
               DropdownButtonFormField<String>(
                 initialValue: _selectedCity,
                 decoration: const InputDecoration(
