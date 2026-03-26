@@ -23,6 +23,7 @@ import 'features/buyer/buyer_home_screen.dart';
 import 'features/buyer/buyer_map_screen.dart';
 import 'features/buyer/buyer_listing_detail_screen.dart';
 import 'features/buyer/buyer_seller_profile_screen.dart';
+import 'features/buyer/saved_sellers_screen.dart';
 import 'features/buyer/my_reservations_screen.dart';
 import 'features/buyer/leave_review_screen.dart';
 import 'features/buyer/buyer_profile_screen.dart';
@@ -146,9 +147,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/buyer/seller/:id',
-        builder: (context, state) => BuyerSellerProfileScreen(
-          sellerId: state.pathParameters['id']!,
-        ),
+        builder: (context, state) => BuyerSellerProfileScreen(sellerId: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: '/buyer/saved-sellers',
+        builder: (context, state) => const SavedSellersScreen(),
       ),
       GoRoute(
         path: '/buyer/review/:sellerId',

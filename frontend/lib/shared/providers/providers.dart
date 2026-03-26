@@ -289,50 +289,12 @@ final filteredListingsProvider = Provider<AsyncValue<List<Listing>>>((ref) {
 // ─── Seller Public Profile (for buyer view) ───
 final sellerProfileProvider =
     FutureProvider.family<Map<String, dynamic>, String>((ref, sellerId) async {
-  final firestore = ref.watch(firestoreProvider);
+  return ref.watch(productServiceProvider).getSellerProfile(sellerId);
+});
 
-  // Seller doc
-  final sellerDoc = await firestore.collection('sellers').doc(sellerId).get();
-  final profile = sellerDoc.exists ? sellerDoc.data()! : <String, dynamic>{};
-
-  // Listings (all products -> listings sub-collection)
-  final productsSnap = await firestore
-      .collection('users')
-      .doc(sellerId)
-      .collection('products')
-      .get();
-
-  final List<Map<String, dynamic>> listings = [];
-  for (final productDoc in productsSnap.docs) {
-    final listingsSnap =
-        await productDoc.reference.collection('listings').get();
-    for (final listingDoc in listingsSnap.docs) {
-      listings.add({
-        ...productDoc.data(),
-        ...listingDoc.data(),
-        'id': listingDoc.id,
-        'sellerId': sellerId,
-        'productId': productDoc.id,
-      });
-    }
-  }
-
-  // Reviews
-  final reviewsSnap = await firestore
-      .collection('reviews')
-      .where('sellerId', isEqualTo: sellerId)
-      .get();
-  final reviews = reviewsSnap.docs
-      .map((d) => {'id': d.id, ...d.data()})
-      .toList()
-    ..sort((a, b) {
-      final aTime = a['createdAt'];
-      final bTime = b['createdAt'];
-      if (aTime == null || bTime == null) return 0;
-      return (bTime as dynamic).compareTo(aTime);
-    });
-
-  return {'profile': profile, 'listings': listings, 'reviews': reviews};
+// ─── Saved Sellers ───
+final savedSellersProvider = StreamProvider<List<String>>((ref) {
+  return ref.watch(productServiceProvider).getSavedSellerIds();
 });
 
 // ─── Theme Mode ───

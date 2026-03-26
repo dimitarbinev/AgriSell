@@ -30,6 +30,38 @@ class BuyerSellerProfileScreen extends ConsumerWidget {
               onPressed: () => context.go('/buyer/home'),
             ),
             title: const Text('Seller Profile'),
+            actions: [
+              Consumer(
+                builder: (context, ref, child) {
+                  final savedSellersAsync = ref.watch(savedSellersProvider);
+                  return savedSellersAsync.when(
+                    data: (ids) {
+                      final isSaved = ids.contains(sellerId);
+                      return IconButton(
+                        icon: Icon(
+                          isSaved ? Icons.favorite : Icons.favorite_border,
+                          color: isSaved ? AppTheme.statusCancelled : null,
+                        ),
+                        onPressed: () async {
+                          try {
+                            await ref.read(productServiceProvider).toggleSaveSeller(sellerId);
+                          } catch (e) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Error: $e')),
+                              );
+                            }
+                          }
+                        },
+                      );
+                    },
+                    loading: () => const SizedBox.shrink(),
+                    error: (_, __) => const SizedBox.shrink(),
+                  );
+                },
+              ),
+              const SizedBox(width: 8),
+            ],
           ),
           body: SingleChildScrollView(
             padding: const EdgeInsets.all(20),

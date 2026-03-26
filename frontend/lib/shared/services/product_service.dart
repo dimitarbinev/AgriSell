@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
@@ -253,5 +254,38 @@ class ProductService {
     }
 
     return jsonDecode(response.body);
+  }
+
+  Future<void> toggleSaveSeller(String sellerId) async {
+    final user = _auth.currentUser;
+    if (user == null) throw Exception('No authenticated user found');
+
+    final firestore = FirebaseFirestore.instance;
+    final docRef = firestore
+        .collection('buyers')
+        .doc(user.uid)
+        .collection('savedSellers')
+        .doc(sellerId);
+
+    final doc = await docRef.get();
+    if (doc.exists) {
+      await docRef.delete();
+    } else {
+      await docRef.set({
+        'savedAt': FieldValue.serverTimestamp(),
+      });
+    }
+  }
+
+  Stream<List<String>> getSavedSellerIds() {
+    final user = _auth.currentUser;
+    if (user == null) return Stream.value([]);
+
+    return FirebaseFirestore.instance
+        .collection('buyers')
+        .doc(user.uid)
+        .collection('savedSellers')
+        .snapshots()
+        .map((snap) => snap.docs.map((doc) => doc.id).toList());
   }
 }
