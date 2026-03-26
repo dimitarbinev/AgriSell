@@ -121,7 +121,7 @@ class Product {
     return Product(
       id: id,
       sellerId: json['sellerId'] as String? ?? '',
-      name: json['name'] as String? ?? '',
+      name: (json['productName'] ?? json['name']) as String? ?? '',
       category: json['category'] as String? ?? '',
       origin: json['origin'] as String? ?? '',
       pricePerKg: (json['pricePerKg'] as num?)?.toDouble() ?? 0.0,
@@ -130,7 +130,7 @@ class Product {
       minThreshold: (json['minThreshold'] as num?)?.toDouble() ?? 0.0,
       maxCapacity: (json['maxCapacity'] as num?)?.toDouble() ?? 0.0,
       season: json['season'] as String? ?? '',
-      imageUrl: json['imageUrl'] as String?,
+      imageUrl: (json['image'] ?? json['imageUrl']) as String?,
     );
   }
 

@@ -1,23 +1,27 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../core/theme.dart';
 import '../../core/constants.dart';
+import '../../shared/providers/providers.dart';
+import '../../shared/models/models.dart';
 
-class CreateListingScreen extends StatefulWidget {
+class CreateListingScreen extends ConsumerStatefulWidget {
   const CreateListingScreen({super.key});
 
   @override
-  State<CreateListingScreen> createState() => _CreateListingScreenState();
+  ConsumerState<CreateListingScreen> createState() => _CreateListingScreenState();
 }
 
-class _CreateListingScreenState extends State<CreateListingScreen> {
+class _CreateListingScreenState extends ConsumerState<CreateListingScreen> {
   final _priceController = TextEditingController();
-  String? _selectedProduct;
+  Product? _selectedProduct;
   String? _selectedCity;
   DateTime? _selectedDate;
   TimeOfDay? _startTime;
   TimeOfDay? _endTime;
+  bool _isLoading = false;
 
   @override
   void dispose() {
@@ -66,13 +70,55 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
     }
   }
 
-  void _handleCreate() {
-    // TODO: Create listing in Firestore
-    context.go('/seller/dashboard');
+  Future<void> _handleCreate() async {
+    if (_selectedProduct == null ||
+        _selectedCity == null ||
+        _selectedDate == null ||
+        _startTime == null ||
+        _endTime == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please fill in all fields')),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      final startTimeStr = '${_startTime!.hour.toString().padLeft(2, '0')}:${_startTime!.minute.toString().padLeft(2, '0')}';
+      final endTimeStr = '${_endTime!.hour.toString().padLeft(2, '0')}:${_endTime!.minute.toString().padLeft(2, '0')}';
+
+      await ref.read(productServiceProvider).confirmListing(
+            productId: _selectedProduct!.id,
+            city: _selectedCity!,
+            date: _selectedDate!,
+            startTime: startTimeStr,
+            endTime: endTimeStr,
+          );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Listing created successfully')),
+        );
+        context.go('/seller/dashboard');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to create listing: ${e.toString()}')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final productsAsync = ref.watch(sellerProductsProvider);
+
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
@@ -90,21 +136,44 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               // Product selection
-              DropdownButtonFormField<String>(
-                initialValue: _selectedProduct,
-                decoration: const InputDecoration(
-                  labelText: 'Select Product',
-                  prefixIcon: Icon(Icons.eco, size: 20),
+              productsAsync.when(
+                data: (products) => DropdownButtonFormField<Product>(
+                  value: _selectedProduct,
+                  decoration: const InputDecoration(
+                    labelText: 'Select Product',
+                    prefixIcon: Icon(Icons.eco, size: 20),
+                  ),
+                  dropdownColor: AppTheme.cardSurface,
+                  items: products
+                      .map((p) => DropdownMenuItem(value: p, child: Text(p.name)))
+                      .toList(),
+                  onChanged: (v) {
+                    setState(() {
+                      _selectedProduct = v;
+                      if (v != null) {
+                        _priceController.text = v.pricePerKg.toStringAsFixed(2);
+                      }
+                    });
+                  },
                 ),
-                dropdownColor: AppTheme.cardSurface,
-                items: ['Fresh Tomatoes', 'Organic Apples', 'Sunflower Honey']
-                    .map((p) => DropdownMenuItem(value: p, child: Text(p)))
-                    .toList(),
-                onChanged: (v) => setState(() => _selectedProduct = v),
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (err, _) => Text('Error loading products: $err',
+                    style: const TextStyle(color: Colors.red)),
               ),
               const SizedBox(height: 16),
 
-              // City
+              // Price (Pre-filled but read-only)
+              TextField(
+                controller: _priceController,
+                readOnly: true,
+                style: const TextStyle(color: AppTheme.textPrimary),
+                decoration: const InputDecoration(
+                  labelText: 'Price per kg (from product)',
+                  prefixIcon: Icon(Icons.payments_outlined, size: 20),
+                  prefixText: 'лв ',
+                ),
+              ),
+              const SizedBox(height: 16),
               DropdownButtonFormField<String>(
                 initialValue: _selectedCity,
                 decoration: const InputDecoration(
@@ -200,12 +269,21 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
                   borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
                 ),
                 child: ElevatedButton(
-                  onPressed: _handleCreate,
+                  onPressed: _isLoading ? null : _handleCreate,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.transparent,
                     shadowColor: Colors.transparent,
                   ),
-                  child: const Text('Create Listing'),
+                  child: _isLoading
+                      ? const SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.5,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text('Create Listing'),
                 ),
               ),
             ],

@@ -127,19 +127,8 @@ final sellerListingsProvider = StreamProvider.family<List<Listing>, String>((
 });
 
 // ─── Seller's Products ───
-final sellerProductsProvider = StreamProvider.family<List<Product>, String>((
-  ref,
-  sellerId,
-) {
-  return ref
-      .watch(firestoreProvider)
-      .collection('products')
-      .where('sellerId', isEqualTo: sellerId)
-      .snapshots()
-      .map(
-        (snap) =>
-            snap.docs.map((d) => Product.fromJson(d.data(), d.id)).toList(),
-      );
+final sellerProductsProvider = FutureProvider<List<Product>>((ref) {
+  return ref.watch(productServiceProvider).getProducts();
 });
 
 // ─── Listing Reservations ───
