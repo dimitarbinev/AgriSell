@@ -7,8 +7,14 @@ import { Product, Status } from "../src/types.js";
 export const productListing = catch_async(async (req: Request, res: Response) => {
     const productData: Partial<Product> = req.body;
 
-    if(!productData.productName || !productData.minThreshold || !productData.maxCapacity || !productData.category || !productData.origin || !productData.image || !productData.pricePerKg) {
-        return res.status(400).json({message: "All fields are required"})
+    const requiredFields = ['productName', 'minThreshold', 'maxCapacity', 'category', 'origin', 'pricePerKg', 'availableQuantity'];
+    const missingFields = requiredFields.filter(field => !productData[field as keyof Product]);
+
+    if (missingFields.length > 0) {
+        console.log("Missing fields in product listing:", missingFields);
+        return res.status(400).json({
+            message: `Missing fields: ${missingFields.join(', ')}`
+        });
     }
 
     const uid = req.user?.uid as string;
@@ -31,6 +37,7 @@ export const productListing = catch_async(async (req: Request, res: Response) =>
         image: productData.image,
         origin: productData.origin,
         pricePerKg: productData.pricePerKg,
+        availableQuantity: productData.availableQuantity,
         season: productData.season,
         sellerId: uid,
         createdAt: new Date()

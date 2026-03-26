@@ -68,9 +68,17 @@ class SellerListingDetailScreen extends ConsumerWidget {
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
                           color: AppTheme.cardSurfaceLight,
+                          image: listing.productImageUrl != null
+                              ? DecorationImage(
+                                  image: NetworkImage(listing.productImageUrl!),
+                                  fit: BoxFit.cover,
+                                )
+                              : null,
                         ),
-                        child: const Icon(Icons.eco,
-                            color: AppTheme.accentGreen, size: 32),
+                        child: listing.productImageUrl == null
+                            ? const Icon(Icons.eco,
+                                color: AppTheme.accentGreen, size: 32)
+                            : null,
                       ),
                       const SizedBox(width: 16),
                       Expanded(

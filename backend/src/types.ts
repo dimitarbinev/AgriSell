@@ -23,6 +23,7 @@ export interface Product {
   origin: string;
   image?: string;
   pricePerKg: number;
+  availableQuantity: number;
   season?: string;
   sellerId: string;
   createdAt: Date;
