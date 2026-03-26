@@ -19,9 +19,30 @@ firebase_available = False
 try:
     # Check if already initialized to prevent ValueError during development server reloads
     if not firebase_admin._apps:
-        # Point to the actual key in the backend directory
-        cred = credentials.Certificate("../backend/serviceAccountKey.json")
-        firebase_admin.initialize_app(cred)
+        # Load credentials from .env
+        service_account_info = {
+            "type": os.getenv("FIREBASE_TYPE"),
+            "project_id": os.getenv("FIREBASE_PROJECT_ID"),
+            "private_key_id": os.getenv("FIREBASE_PRIVATE_KEY_ID"),
+            "private_key": os.getenv("FIREBASE_PRIVATE_KEY").replace("\\n", "\n") if os.getenv("FIREBASE_PRIVATE_KEY") else None,
+            "client_email": os.getenv("FIREBASE_CLIENT_EMAIL"),
+            "client_id": os.getenv("FIREBASE_CLIENT_ID"),
+            "auth_uri": os.getenv("FIREBASE_AUTH_URI"),
+            "token_uri": os.getenv("FIREBASE_TOKEN_URI"),
+            "auth_provider_x509_cert_url": os.getenv("FIREBASE_AUTH_PROVIDER_X509_CERT_URL"),
+            "client_x509_cert_url": os.getenv("FIREBASE_CLIENT_X509_CERT_URL"),
+            "universe_domain": os.getenv("FIREBASE_UNIVERSE_DOMAIN")
+        }
+        
+        # Filter out None values
+        service_account_info = {k: v for k, v in service_account_info.items() if v is not None}
+        
+        if service_account_info:
+            cred = credentials.Certificate(service_account_info)
+            firebase_admin.initialize_app(cred)
+        else:
+            print("WARNING: Firebase credentials not found in .env")
+    
     db = firestore.client()
     firebase_available = True
 except Exception as e:
