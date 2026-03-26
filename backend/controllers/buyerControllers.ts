@@ -159,7 +159,7 @@ export const placeOrder = catch_async(async (req: Request, res: Response) => {
 });
 
 export const getSellerProfile = catch_async(async (req: Request, res: Response) => {
-    const { id } = req.params as any;
+    const id = req.params.uid || req.params.id as any;
     const sellerDoc = await db.collection("users").doc(id).get();
     
     if (!sellerDoc.exists) {
