@@ -22,11 +22,23 @@ logging.basicConfig(
 )
 
 # ----------------- Firebase -----------------
-cred = credentials.Certificate("hacktues12-firebase-adminsdk-fbsvc-7ce9f543c1.json")
+import json
+with open("hacktues12-firebase-adminsdk-fbsvc-7ce9f543c1.json", "r") as f:
+    service_account_info = json.load(f)
+
+# Inject sensitive keys from .env
+service_account_info["private_key_id"] = os.getenv("PRIVATE_KEY_ID")
+service_account_info["private_key"] = os.getenv("PRIVATE_KEY").replace("\\n", "\n") if os.getenv("PRIVATE_KEY") else None
+
+cred = credentials.Certificate(service_account_info)
 firebase_admin.initialize_app(cred)
 db = firestore.client()
 
 BOT_TOKEN = os.getenv("BOT_KEY_TOKEN")
+
+if not BOT_TOKEN:
+    print("❌ ERROR: BOT_KEY_TOKEN not found in .env!")
+    exit(1)
 
 # ----------------- Conversation states -----------------
 PHONE, CHOICE, PRODUCT_SELECT = range(3)
@@ -46,14 +58,22 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ----------------- Handle phone -----------------
 async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    contact = update.message.contact
-    phone = contact.phone_number
-
-    # Normalize
-    if phone.startswith("359"):
-        phone_clean = "0" + phone[3:]
+    # Get phone from contact or text
+    if update.message.contact:
+        phone = update.message.contact.phone_number
     else:
-        phone_clean = phone
+        phone = update.message.text
+
+    # Basic cleanup: keep only digits
+    phone_digits = "".join(filter(str.isdigit, phone))
+    
+    # Normalize Bulgarian international/local formats
+    if phone_digits.startswith("359"):
+        phone_clean = "0" + phone_digits[3:]
+    elif len(phone_digits) == 9 and not phone_digits.startswith("0"):
+        phone_clean = "0" + phone_digits
+    else:
+        phone_clean = phone_digits
 
     context.user_data["phone"] = phone_clean
 
@@ -76,12 +96,22 @@ async def handle_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Get user document by phone
     users_ref = db.collection("users")
+    
+    # Try normalized local format (088...)
     query = users_ref.where("phoneNumber", "==", phone).limit(1).stream()
     user_doc = None
     for doc in query:
         user_doc = doc
+    
+    # If not found, try international format (+359...) if it looks like a BG number
+    if not user_doc and phone.startswith("0"):
+        intl_phone = "+359" + phone[1:]
+        query = users_ref.where("phoneNumber", "==", intl_phone).limit(1).stream()
+        for doc in query:
+            user_doc = doc
+
     if not user_doc:
-        await update.message.reply_text("No user found.")
+        await update.message.reply_text("No user found with this phone number. Please ensure you are registered.")
         return ConversationHandler.END
 
     context.user_data["user_doc_id"] = user_doc.id
@@ -112,15 +142,21 @@ async def handle_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
         products_docs = list(products_ref.stream())
         if not products_docs:
             await update.message.reply_text("You have no products.")
-            return ConversationHandler.END
+            return CHOICE
 
-        # Store products in user_data
-        products = {doc.id: doc.to_dict() for doc in products_docs}
-        context.user_data["products"] = products
-
-        # Show list of product names as buttons
-        product_names = [p.get("productName", f"Product {i+1}") for i, p in enumerate(products.values())]
-        keyboard = ReplyKeyboardMarkup([[name] for name in product_names], resize_keyboard=True)
+        # Store products in user_data with a mapping of display name -> product data
+        product_map = {}
+        for i, doc in enumerate(products_docs):
+            p_data = doc.to_dict()
+            p_name = p_data.get("productName") or f"Product {i+1}"
+            product_map[p_name] = p_data
+        
+        context.user_data["product_map"] = product_map
+        
+        # Show list of product names as buttons, plus a Back button
+        buttons = [[name] for name in product_map.keys()]
+        buttons.append(["Back to Menu"])
+        keyboard = ReplyKeyboardMarkup(buttons, resize_keyboard=True)
         await update.message.reply_text("Select a product:", reply_markup=keyboard)
         return PRODUCT_SELECT
     else:
@@ -130,21 +166,27 @@ async def handle_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ----------------- Handle product selection -----------------
 async def handle_product_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
     selected_name = update.message.text
-    # Find product by name
-    products = context.user_data.get("products", {})
-    product_data = None
-    for p in products.values():
-        if p.get("productName") == selected_name:
-            product_data = p
-            break
+    
+    if selected_name == "Back to Menu":
+        keyboard = ReplyKeyboardMarkup(
+            [["User Details", "Product Details"]],
+            resize_keyboard=True
+        )
+        await update.message.reply_text("Main Menu:", reply_markup=keyboard)
+        return CHOICE
+
+    product_map = context.user_data.get("product_map", {})
+    product_data = product_map.get(selected_name)
 
     if not product_data:
-        await update.message.reply_text("No data for this product.")
+        await update.message.reply_text("Please select a product from the list or 'Back to Menu'.")
+        return PRODUCT_SELECT
     else:
-        message = f"{selected_name} Details:\n" + "\n".join([f"{k}: {v}" for k, v in product_data.items()])
-        await update.message.reply_text(message)
+        # Format product details excluding large or system fields if any
+        details = "\n".join([f"<b>{k}</b>: {v}" for k, v in product_data.items()])
+        await update.message.reply_text(f"<b>{selected_name} Details:</b>\n{details}", parse_mode="HTML")
 
-    # Go back to main menu
+    # Offer to go back
     keyboard = ReplyKeyboardMarkup(
         [["User Details", "Product Details"]],
         resize_keyboard=True
@@ -164,7 +206,10 @@ def main():
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler("start", start)],
         states={
-            PHONE: [MessageHandler(filters.CONTACT, handle_contact)],
+            PHONE: [
+                MessageHandler(filters.CONTACT, handle_contact),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_contact)
+            ],
             CHOICE: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_choice)],
             PRODUCT_SELECT: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_product_select)],
         },
