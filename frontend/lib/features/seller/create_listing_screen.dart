@@ -191,17 +191,7 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
               ),
               const SizedBox(height: 16),
 
-              // Price
-              TextField(
-                controller: _priceController,
-                keyboardType: TextInputType.number,
-                style: const TextStyle(color: AppTheme.textPrimary),
-                decoration: const InputDecoration(
-                  labelText: 'Price per kg (лв)',
-                  prefixIcon: Icon(Icons.attach_money, size: 20),
-                ),
-              ),
-              const SizedBox(height: 28),
+
 
               Container(
                 height: 52,

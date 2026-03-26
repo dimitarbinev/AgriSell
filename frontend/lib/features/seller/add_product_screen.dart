@@ -1,16 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme.dart';
 import '../../core/constants.dart';
+import '../../shared/providers/providers.dart';
 
-class AddProductScreen extends StatefulWidget {
+class AddProductScreen extends ConsumerStatefulWidget {
   const AddProductScreen({super.key});
 
   @override
-  State<AddProductScreen> createState() => _AddProductScreenState();
+  ConsumerState<AddProductScreen> createState() => _AddProductScreenState();
 }
 
-class _AddProductScreenState extends State<AddProductScreen> {
+class _AddProductScreenState extends ConsumerState<AddProductScreen> {
   final _nameController = TextEditingController();
   final _originController = TextEditingController();
   final _priceController = TextEditingController();
@@ -19,6 +21,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
   final _maxCapacityController = TextEditingController();
   String? _selectedCategory;
   String? _selectedSeason;
+
+  bool _isLoading = false;
 
   @override
   void dispose() {
@@ -31,9 +35,69 @@ class _AddProductScreenState extends State<AddProductScreen> {
     super.dispose();
   }
 
-  void _handleSave() {
-    // TODO: Save product to Firestore
-    context.go('/seller/dashboard');
+  Future<void> _handleSave() async {
+    final name = _nameController.text.trim();
+    final origin = _originController.text.trim();
+    final priceStr = _priceController.text.trim();
+    // final quantityStr = _quantityController.text.trim(); // Ignored per backend spec
+    final minThresholdStr = _minThresholdController.text.trim();
+    final maxCapacityStr = _maxCapacityController.text.trim();
+
+    if (name.isEmpty ||
+        origin.isEmpty ||
+        priceStr.isEmpty ||
+        minThresholdStr.isEmpty ||
+        maxCapacityStr.isEmpty ||
+        _selectedCategory == null ||
+        _selectedSeason == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please fill in all required fields')),
+      );
+      return;
+    }
+
+    final price = double.tryParse(priceStr);
+    final minThreshold = double.tryParse(minThresholdStr);
+    final maxCapacity = double.tryParse(maxCapacityStr);
+
+    if (price == null || minThreshold == null || maxCapacity == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter valid numeric values')),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      await ref.read(productServiceProvider).addProduct(
+            productName: name,
+            minThreshold: minThreshold,
+            maxCapacity: maxCapacity,
+            category: _selectedCategory!,
+            origin: origin,
+            image: "https://via.placeholder.com/150", // Temporary placeholder
+            pricePerKg: price,
+            season: _selectedSeason!,
+          );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Product listed successfully')),
+        );
+        context.go('/seller/dashboard');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to add product: ${e.toString()}')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   @override
@@ -167,12 +231,21 @@ class _AddProductScreenState extends State<AddProductScreen> {
                   borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
                 ),
                 child: ElevatedButton(
-                  onPressed: _handleSave,
+                  onPressed: _isLoading ? null : _handleSave,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.transparent,
                     shadowColor: Colors.transparent,
                   ),
-                  child: const Text('Save Product'),
+                  child: _isLoading
+                      ? const SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.5,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text('Save Product'),
                 ),
               ),
             ],
