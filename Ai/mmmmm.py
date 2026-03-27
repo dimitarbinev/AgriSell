@@ -9,8 +9,13 @@ import os
 import asyncio
 from math import radians, cos, sin, asin, sqrt
 from dotenv import load_dotenv
+from Telegram_bot.test import create_application
+import logging
 
 load_dotenv()
+
+# Global bot instance
+bot_app = None
 
 # -------------------------------------------------------
 # Firebase setup
@@ -20,15 +25,13 @@ firebase_available = False
 
 try:
     if not firebase_admin._apps:
-        # 1. Try to load from local JSON file (as seen in Telegram_bot/test.py)
+        # 1. Try to load from local JSON file
         json_path = os.path.join(os.path.dirname(__file__), "Telegram_bot", "hacktues12-firebase-adminsdk-fbsvc-7ce9f543c1.json")
         
         if os.path.exists(json_path):
-            import json
             with open(json_path, "r") as f:
                 service_account_info = json.load(f)
             
-            # Use environment variables if they provide more up-to-date keys
             pk_id = os.getenv("PRIVATE_KEY_ID")
             pk = os.getenv("PRIVATE_KEY")
             if pk_id: service_account_info["private_key_id"] = pk_id
@@ -55,10 +58,14 @@ try:
             if service_account_info:
                 cred = credentials.Certificate(service_account_info)
                 firebase_admin.initialize_app(cred)
-        
+
+    # Always try to get the client if at least one app is initialized
+    if firebase_admin._apps:
         db = firestore.client()
         firebase_available = True
-        print("✅ Firebase initialized successfully.")
+        print("✅ Firebase client initialized successfully.")
+    else:
+        print("❌ No Firebase apps initialized.")
 except Exception as e:
     print(f"❌ Firebase initialization error: {e}")
 
@@ -122,6 +129,10 @@ class DbRouteRequest(BaseModel):
     product_id: str
     cost_per_hour: float = 15.0
     start_location_name: str = "Склад на продавача"
+
+class TelegramMessageRequest(BaseModel):
+    phone_number: str
+    message: str
 
 # -------------------------------------------------------
 # Helpers
@@ -250,7 +261,7 @@ async def recommend_route(req: DbRouteRequest):
                     total_km = sum(l["distance"]["value"] for l in route["legs"]) / 1000
                     
                     order = route.get("waypoint_order", [])
-                    stops = [req.start_location_name]
+                    stops = [seller_city_name]
                     for idx in order:
                         stops.append(wps[idx].name)
                     stops.append(dest.name)
@@ -291,6 +302,72 @@ async def recommend_route(req: DbRouteRequest):
 
     except Exception as e:
         print(f"Algorithm error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.on_event("startup")
+async def startup_event():
+    global bot_app
+    try:
+        bot_app = create_application()
+        await bot_app.initialize()
+        await bot_app.start()
+        await bot_app.updater.start_polling()
+        print("🚀 Telegram Bot started alongside FastAPI")
+    except Exception as e:
+        print(f"❌ Error starting Telegram Bot: {e}")
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    global bot_app
+    if bot_app:
+        try:
+            await bot_app.updater.stop()
+            await bot_app.stop()
+            await bot_app.shutdown()
+            print("🛑 Telegram Bot stopped")
+        except Exception as e:
+            print(f"❌ Error during Telegram Bot shutdown: {e}")
+
+@app.post("/send-telegram-message")
+async def send_telegram_message(req: TelegramMessageRequest):
+    if not bot_app:
+        raise HTTPException(status_code=503, detail="Telegram bot not initialized")
+    
+    # 1. Normalize phone
+    phone_digits = "".join(filter(str.isdigit, req.phone_number))
+    if phone_digits.startswith("359"):
+        phone_clean = "0" + phone_digits[3:]
+    elif len(phone_digits) == 9 and not phone_digits.startswith("0"):
+        phone_clean = "0" + phone_digits
+    else:
+        phone_clean = phone_digits
+
+    # 2. Find user in Firestore to get chat_id
+    if not firebase_available or db is None:
+        raise HTTPException(status_code=503, detail="Firebase not available")
+
+    try:
+        users_ref = db.collection("users")
+        query = users_ref.where("phoneNumber", "==", phone_clean).limit(1).get()
+        if not query:
+            intl_phone = "+359" + phone_clean[1:] if phone_clean.startswith("0") else phone_clean
+            query = users_ref.where("phoneNumber", "==", intl_phone).limit(1).get()
+
+        if not query:
+            raise HTTPException(status_code=404, detail=f"User with phone {req.phone_number} not found in Firestore")
+
+        user_data = query[0].to_dict()
+        chat_id = user_data.get("telegramChatId")
+
+        if not chat_id:
+            raise HTTPException(status_code=400, detail="User has not registered with the Telegram bot yet (telegramChatId missing)")
+
+        # 3. Send message via Telegram bot
+        await bot_app.bot.send_message(chat_id=chat_id, text=req.message)
+        return {"status": "success", "to": phone_clean, "message": "Sent!"}
+        
+    except Exception as e:
+        print(f"Error sending telegram message: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":

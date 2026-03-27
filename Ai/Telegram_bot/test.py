@@ -23,15 +23,24 @@ logging.basicConfig(
 
 # ----------------- Firebase -----------------
 import json
-with open("hacktues12-firebase-adminsdk-fbsvc-7ce9f543c1.json", "r") as f:
-    service_account_info = json.load(f)
+if not firebase_admin._apps:
+    # Build robust path to JSON file
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    json_path = os.path.join(current_dir, "hacktues12-firebase-adminsdk-fbsvc-7ce9f543c1.json")
+    
+    with open(json_path, "r") as f:
+        service_account_info = json.load(f)
 
-# Inject sensitive keys from .env
-service_account_info["private_key_id"] = os.getenv("PRIVATE_KEY_ID")
-service_account_info["private_key"] = os.getenv("PRIVATE_KEY").replace("\\n", "\n") if os.getenv("PRIVATE_KEY") else None
+    # Inject sensitive keys from .env
+    service_account_info["private_key_id"] = os.getenv("PRIVATE_KEY_ID")
+    service_account_info["private_key"] = os.getenv("PRIVATE_KEY").replace("\\n", "\n") if os.getenv("PRIVATE_KEY") else None
 
-cred = credentials.Certificate(service_account_info)
-firebase_admin.initialize_app(cred)
+    cred = credentials.Certificate(service_account_info)
+    firebase_admin.initialize_app(cred)
+else:
+    # Use existing app
+    pass
+
 db = firestore.client()
 
 BOT_TOKEN = os.getenv("BOT_KEY_TOKEN")
@@ -76,6 +85,22 @@ async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
         phone_clean = phone_digits
 
     context.user_data["phone"] = phone_clean
+
+    # --- Save Chat ID to Firestore ---
+    try:
+        users_ref = db.collection("users")
+        # Try both formats
+        query = users_ref.where("phoneNumber", "==", phone_clean).limit(1).get()
+        if not query:
+            intl_phone = "+359" + phone_clean[1:] if phone_clean.startswith("0") else phone_clean
+            query = users_ref.where("phoneNumber", "==", intl_phone).limit(1).get()
+        
+        if query:
+            user_doc_id = query[0].id
+            users_ref.document(user_doc_id).update({"telegramChatId": update.effective_chat.id})
+            logging.info(f"Updated telegramChatId for user {user_doc_id}")
+    except Exception as e:
+        logging.error(f"Error saving chat_id: {e}")
 
     # Ask to see products (User Details removed)
     keyboard = ReplyKeyboardMarkup(
@@ -180,7 +205,7 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return ConversationHandler.END
 
 # ----------------- Main -----------------
-def main():
+def create_application():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
     conv_handler = ConversationHandler(
@@ -197,8 +222,22 @@ def main():
     )
 
     app.add_handler(conv_handler)
+    return app
 
-    print("🚀 Bot is running...")
+async def run_bot():
+    app = create_application()
+    async with app:
+        await app.initialize()
+        await app.start()
+        await app.updater.start_polling()
+        print("🚀 Bot is running...")
+        # Keep it running until cancelled
+        while True:
+            await asyncio.sleep(1)
+
+def main():
+    app = create_application()
+    print("🚀 Bot is running (standalone)...")
     app.run_polling()
 
 if __name__ == "__main__":
