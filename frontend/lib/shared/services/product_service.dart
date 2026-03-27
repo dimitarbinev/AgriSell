@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
@@ -130,6 +131,31 @@ class ProductService {
     }
   }
 
+  Future<List<Listing>> getAvailableListings() async {
+    final user = _auth.currentUser;
+    if (user == null) throw Exception('No authenticated user found');
+
+    final idToken = await user.getIdToken();
+    if (idToken == null) throw Exception('Failed to retrieve authentication token');
+
+    final cleanBaseUrl = _baseUrl.endsWith('/') ? _baseUrl.substring(0, _baseUrl.length - 1) : _baseUrl;
+    final url = Uri.parse('$cleanBaseUrl/buyer/available_listings');
+
+    final response = await http.get(
+      url,
+      headers: {
+        'Authorization': 'Bearer $idToken',
+      },
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to load available listings: ${response.body}');
+    }
+
+    final List<dynamic> data = jsonDecode(response.body);
+    return data.map((item) => Listing.fromJson(item, item['id'] ?? '')).toList();
+  }
+
   Future<void> updateListingStatus({
     required String productId,
     required String listingId,
@@ -163,5 +189,128 @@ class ProductService {
       final result = jsonDecode(response.body);
       throw Exception(result['message'] ?? 'Failed to update listing status');
     }
+  }
+
+  Future<void> placeOrder({
+    required String listingId,
+    required String sellerId,
+    required String productId,
+    required double quantity,
+    required double deposit,
+  }) async {
+    final user = _auth.currentUser;
+    if (user == null) throw Exception('No authenticated user found');
+
+    final idToken = await user.getIdToken();
+    if (idToken == null) throw Exception('Failed to retrieve authentication token');
+
+    final cleanBaseUrl = _baseUrl.endsWith('/') ? _baseUrl.substring(0, _baseUrl.length - 1) : _baseUrl;
+    final url = Uri.parse('$cleanBaseUrl/buyer/place_order');
+
+    final payload = {
+      'listingId': listingId,
+      'sellerId': sellerId,
+      'productId': productId,
+      'quantity': quantity,
+      'deposit': deposit,
+    };
+
+    print('[ProductService] Placing order with payload: ${jsonEncode(payload)}');
+
+    final response = await http.post(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $idToken',
+      },
+      body: jsonEncode(payload),
+    );
+
+    if (response.statusCode != 200) {
+      final result = jsonDecode(response.body);
+      throw Exception(result['message'] ?? 'Failed to place order');
+    }
+  }
+
+  Future<Map<String, dynamic>> getSellerProfile(String sellerId) async {
+    final user = _auth.currentUser;
+    if (user == null) throw Exception('No authenticated user found');
+
+    final idToken = await user.getIdToken();
+    if (idToken == null) throw Exception('Failed to retrieve authentication token');
+
+    final cleanBaseUrl = _baseUrl.endsWith('/') ? _baseUrl.substring(0, _baseUrl.length - 1) : _baseUrl;
+    final url = Uri.parse('$cleanBaseUrl/buyer/seller/$sellerId');
+
+    final response = await http.get(
+      url,
+      headers: {
+        'Authorization': 'Bearer $idToken',
+      },
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to load seller profile: ${response.body}');
+    }
+
+    return jsonDecode(response.body);
+  }
+
+  Future<void> toggleSaveSeller(String sellerId) async {
+    final user = _auth.currentUser;
+    if (user == null) throw Exception('No authenticated user found');
+
+    final firestore = FirebaseFirestore.instance;
+    final docRef = firestore
+        .collection('buyers')
+        .doc(user.uid)
+        .collection('savedSellers')
+        .doc(sellerId);
+
+    final doc = await docRef.get();
+    if (doc.exists) {
+      await docRef.delete();
+    } else {
+      await docRef.set({
+        'savedAt': FieldValue.serverTimestamp(),
+      });
+    }
+  }
+
+  Stream<List<String>> getSavedSellerIds() {
+    final user = _auth.currentUser;
+    if (user == null) return Stream.value([]);
+
+    return FirebaseFirestore.instance
+        .collection('buyers')
+        .doc(user.uid)
+        .collection('savedSellers')
+        .snapshots()
+        .map((snap) => snap.docs.map((doc) => doc.id).toList());
+  }
+
+  Future<List<Reservation>> getMyReservations() async {
+    final user = _auth.currentUser;
+    if (user == null) throw Exception('No authenticated user found');
+
+    final idToken = await user.getIdToken();
+    if (idToken == null) throw Exception('Failed to retrieve authentication token');
+
+    final cleanBaseUrl = _baseUrl.endsWith('/') ? _baseUrl.substring(0, _baseUrl.length - 1) : _baseUrl;
+    final url = Uri.parse('$cleanBaseUrl/buyer/my_reservations');
+
+    final response = await http.get(
+      url,
+      headers: {
+        'Authorization': 'Bearer $idToken',
+      },
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to load reservations: ${response.body}');
+    }
+
+    final List<dynamic> data = jsonDecode(response.body);
+    return data.map((item) => Reservation.fromJson(item, item['id'] ?? '')).toList();
   }
 }

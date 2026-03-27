@@ -235,6 +235,114 @@ class AppTheme {
       ),
     );
   }
+
+  // ─── Light Theme ───
+  static ThemeData get lightTheme {
+    const Color bg = Color(0xFFF5F7F5);
+    const Color surface = Color(0xFFFFFFFF);
+    const Color surfaceLight = Color(0xFFEEF2EE);
+    const Color onSurface = Color(0xFF1A1A1A);
+    const Color onSurfaceSecondary = Color(0xFF555555);
+
+    final colorScheme = ColorScheme.light(
+      primary: primaryGreen,
+      secondary: accentGreen,
+      surface: surface,
+      onPrimary: Colors.white,
+      onSecondary: Colors.white,
+      onSurface: onSurface,
+      error: statusCancelled,
+    );
+
+    return ThemeData(
+      useMaterial3: true,
+      brightness: Brightness.light,
+      colorScheme: colorScheme,
+      scaffoldBackgroundColor: bg,
+      fontFamily: 'Inter',
+      appBarTheme: const AppBarTheme(
+        backgroundColor: bg,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        centerTitle: false,
+        titleTextStyle: TextStyle(
+          fontFamily: 'Inter',
+          fontSize: 20,
+          fontWeight: FontWeight.w700,
+          color: onSurface,
+        ),
+        iconTheme: IconThemeData(color: onSurface),
+      ),
+      cardTheme: CardThemeData(
+        color: surface,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(radiusLarge),
+        ),
+        margin: const EdgeInsets.symmetric(vertical: 6),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: primaryGreen,
+          foregroundColor: Colors.white,
+          elevation: 0,
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(radiusMedium),
+          ),
+          textStyle: const TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: surfaceLight,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(radiusMedium),
+          borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(radiusMedium),
+          borderSide: BorderSide(color: Colors.grey.shade300),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(radiusMedium),
+          borderSide: const BorderSide(color: primaryGreen, width: 1.5),
+        ),
+        hintStyle: const TextStyle(fontFamily: 'Inter', color: onSurfaceSecondary, fontSize: 14),
+        labelStyle: const TextStyle(fontFamily: 'Inter', color: onSurfaceSecondary, fontSize: 14),
+      ),
+      bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+        backgroundColor: surface,
+        selectedItemColor: primaryGreen,
+        unselectedItemColor: onSurfaceSecondary,
+        type: BottomNavigationBarType.fixed,
+        elevation: 0,
+        selectedLabelStyle: TextStyle(fontFamily: 'Inter', fontSize: 12, fontWeight: FontWeight.w600),
+        unselectedLabelStyle: TextStyle(fontFamily: 'Inter', fontSize: 12, fontWeight: FontWeight.w400),
+      ),
+      dividerTheme: DividerThemeData(
+        color: Colors.grey.shade300,
+        thickness: 1,
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(radiusLarge),
+        ),
+        titleTextStyle: const TextStyle(
+          fontFamily: 'Inter',
+          fontSize: 18,
+          fontWeight: FontWeight.w700,
+          color: onSurface,
+        ),
+      ),
+    );
+  }
 }
 
 // ─── Glassmorphism Decoration ───

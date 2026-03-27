@@ -144,3 +144,4 @@ export const updateListingStatus = catch_async(async (req: Request, res: Respons
 
     return res.status(200).json({ message: "Listing status updated successfully" });
 });
+

@@ -1,7 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/models.dart';
 import '../services/auth_service.dart';
 import '../services/product_service.dart';
@@ -117,44 +119,9 @@ final currentBuyerProvider = StreamProvider<Buyer?>((ref) {
   });
 });
 
-// ─── All Active Listings (Manual Join to avoid Collection Group index) ───
-final activeListingsProvider = StreamProvider<List<Listing>>((ref) {
-  final firestore = ref.watch(firestoreProvider);
-
-  return firestore.collection('users').snapshots().asyncMap((userSnap) async {
-    final sellers = userSnap.docs.where((d) => d.data()['role'] == 'seller');
-    final List<Listing> allConfirmedListings = [];
-
-    for (final sellerDoc in sellers) {
-      final productSnap = await firestore
-          .collection('users')
-          .doc(sellerDoc.id)
-          .collection('products')
-          .get();
-
-      for (final productDoc in productSnap.docs) {
-        final productData = productDoc.data();
-        final listingsSnap = await productDoc.reference.collection('listings').get();
-
-        for (final listingDoc in listingsSnap.docs) {
-          final listingData = listingDoc.data();
-          // Filter for only 'confirmed' sessions (status 1 in enum)
-          final status = listingData['status'];
-          if (status == 1 || status == 'active' || status == 'confirmed') {
-            allConfirmedListings.add(Listing.fromFirestore(
-              productData: productData,
-              listingData: listingData,
-              listingId: listingDoc.id,
-              sellerId: sellerDoc.id,
-              productId: productDoc.id,
-            ));
-          }
-        }
-      }
-    }
-
-    return allConfirmedListings;
-  });
+// ─── All Active Listings (Backend Powered) ───
+final activeListingsProvider = StreamProvider<List<Listing>>((ref) async* {
+  yield await ref.watch(productServiceProvider).getAvailableListings();
 });
 
 // ─── Seller's Listings ───
@@ -224,6 +191,11 @@ final buyerReservationsProvider =
                     .toList(),
           );
     });
+
+// ─── Buyer's Reservations (Backend) ───
+final backendBuyerReservationsProvider = FutureProvider<List<Reservation>>((ref) {
+  return ref.watch(productServiceProvider).getMyReservations();
+});
 
 // ─── Seller Reviews ───
 final sellerReviewsProvider = StreamProvider.family<List<Review>, String>((
@@ -318,3 +290,58 @@ final filteredListingsProvider = Provider<AsyncValue<List<Listing>>>((ref) {
     return filtered;
   });
 });
+
+// ─── Seller Public Profile (for buyer view) ───
+final sellerProfileProvider =
+    FutureProvider.family<Map<String, dynamic>, String>((ref, sellerId) async {
+  return ref.watch(productServiceProvider).getSellerProfile(sellerId);
+});
+
+// ─── Saved Sellers ───
+final savedSellersProvider = StreamProvider<List<String>>((ref) {
+  return ref.watch(productServiceProvider).getSavedSellerIds();
+});
+
+// ─── Theme Mode ───
+class ThemeModeNotifier extends AsyncNotifier<ThemeMode> {
+  static const _key = 'dark_mode';
+
+  @override
+  Future<ThemeMode> build() async {
+    final prefs = await SharedPreferences.getInstance();
+    final isDark = prefs.getBool(_key) ?? true;
+    return isDark ? ThemeMode.dark : ThemeMode.light;
+  }
+
+  Future<void> toggle() async {
+    final current = await future;
+    final isDark = current == ThemeMode.dark;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_key, !isDark);
+    state = AsyncValue.data(!isDark ? ThemeMode.dark : ThemeMode.light);
+  }
+}
+
+final themeModeProvider =
+    AsyncNotifierProvider<ThemeModeNotifier, ThemeMode>(ThemeModeNotifier.new);
+
+// ─── Notifications Enabled ───
+class NotificationsNotifier extends AsyncNotifier<bool> {
+  static const _key = 'notifications_enabled';
+
+  @override
+  Future<bool> build() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_key) ?? true;
+  }
+
+  Future<void> toggle() async {
+    final current = await future;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_key, !current);
+    state = AsyncValue.data(!current);
+  }
+}
+
+final notificationsEnabledProvider =
+    AsyncNotifierProvider<NotificationsNotifier, bool>(NotificationsNotifier.new);

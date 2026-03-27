@@ -14,13 +14,16 @@ import 'features/seller/add_product_screen.dart';
 import 'features/seller/create_listing_screen.dart';
 import 'features/seller/seller_listing_detail_screen.dart';
 import 'features/seller/my_listings_screen.dart';
+import 'features/seller/my_products_screen.dart';
 import 'features/seller/route_planning_screen.dart';
 import 'features/seller/seller_profile_screen.dart';
+import 'features/seller/settings_screen.dart';
 import 'features/buyer/buyer_shell.dart';
 import 'features/buyer/buyer_home_screen.dart';
 import 'features/buyer/buyer_map_screen.dart';
 import 'features/buyer/buyer_listing_detail_screen.dart';
 import 'features/buyer/buyer_seller_profile_screen.dart';
+import 'features/buyer/saved_sellers_screen.dart';
 import 'features/buyer/my_reservations_screen.dart';
 import 'features/buyer/leave_review_screen.dart';
 import 'features/buyer/buyer_profile_screen.dart';
@@ -81,6 +84,10 @@ final routerProvider = Provider<GoRouter>((ref) {
             builder: (context, state) => const MyListingsScreen(),
           ),
           GoRoute(
+            path: '/seller/products',
+            builder: (context, state) => const MyProductsScreen(),
+          ),
+          GoRoute(
             path: '/seller/route',
             builder: (context, state) => const RoutePlanningScreen(),
           ),
@@ -97,6 +104,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/seller/create-listing',
         builder: (context, state) => const CreateListingScreen(),
+      ),
+      GoRoute(
+        path: '/seller/settings',
+        builder: (context, state) => const SettingsScreen(),
       ),
       GoRoute(
         path: '/seller/listing/:id',
@@ -136,9 +147,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/buyer/seller/:id',
-        builder: (context, state) => BuyerSellerProfileScreen(
-          sellerId: state.pathParameters['id']!,
-        ),
+        builder: (context, state) => BuyerSellerProfileScreen(sellerId: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: '/buyer/saved-sellers',
+        builder: (context, state) => const SavedSellersScreen(),
       ),
       GoRoute(
         path: '/buyer/review/:sellerId',

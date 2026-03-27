@@ -71,16 +71,21 @@ class BuyerProfileScreen extends ConsumerWidget {
                   const SizedBox(width: 12),
                   Expanded(child: _StatCard(label: 'Reviews', value: '8', icon: Icons.rate_review_outlined)),
                   const SizedBox(width: 12),
-                  Expanded(child: _StatCard(label: 'Saved', value: '5', icon: Icons.bookmark_outline)),
+                  Expanded(
+                    child: ref.watch(savedSellersProvider).when(
+                      data: (ids) => _StatCard(label: 'Saved', value: ids.length.toString(), icon: Icons.favorite_outline),
+                      loading: () => _StatCard(label: 'Saved', value: '...', icon: Icons.favorite_outline),
+                      error: (_, __) => _StatCard(label: 'Saved', value: '0', icon: Icons.favorite_outline),
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 28),
 
               // Menu items
-              _MenuItem(icon: Icons.edit_outlined, label: 'Edit Profile', onTap: () {}),
-              _MenuItem(icon: Icons.receipt_long, label: 'Reservation History', onTap: () {}),
-              _MenuItem(icon: Icons.favorite_outline, label: 'Saved Sellers', onTap: () {}),
-              _MenuItem(icon: Icons.settings_outlined, label: 'Settings', onTap: () {}),
+
+              _MenuItem(icon: Icons.favorite_outline, label: 'Saved Sellers', onTap: () => context.push('/buyer/saved-sellers')),
+              _MenuItem(icon: Icons.settings_outlined, label: 'Settings', onTap: () => context.push('/seller/settings')),
               _MenuItem(
                 icon: Icons.storefront_outlined,
                 label: 'Switch to Seller',
@@ -99,7 +104,6 @@ class BuyerProfileScreen extends ConsumerWidget {
                   }
                 },
               ),
-              _MenuItem(icon: Icons.help_outline, label: 'Help & Support', onTap: () {}),
               _MenuItem(
                 icon: Icons.logout,
                 label: 'Sign Out',

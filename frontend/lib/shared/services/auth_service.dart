@@ -19,6 +19,36 @@ class AuthService {
     await _storageService?.clearSession();
   }
 
+  Future<Map<String, dynamic>> getProfile() async {
+    final user = _auth.currentUser;
+    if (user == null) throw Exception('No authenticated user found');
+
+    final idToken = await user.getIdToken();
+    if (idToken == null) throw Exception("Failed to get ID token");
+
+    final cleanBaseUrl = _baseUrl.endsWith('/') ? _baseUrl.substring(0, _baseUrl.length - 1) : _baseUrl;
+    final url = Uri.parse('$cleanBaseUrl/auth/profile');
+
+    final response = await http.get(
+      url,
+      headers: {
+        "Authorization": "Bearer $idToken",
+        "Content-Type": "application/json",
+      },
+    );
+
+    if (response.headers['content-type']?.contains('application/json') != true) {
+      throw Exception("Backend returned HTML instead of JSON.");
+    }
+
+    final profile = jsonDecode(response.body);
+
+    if (response.statusCode == 200) {
+      return profile;
+    } else {
+      throw Exception(profile['message'] ?? 'Failed to get profile');
+    }
+  }
 
   Future<Map<String, dynamic>> signIn(String email, String password) async {
     try {
@@ -201,6 +231,46 @@ class AuthService {
       }
     } catch (e) {
       // Error syncing with backend
+    }
+  }
+
+  Future<void> updateCredentials({
+    String? name,
+    String? email,
+    String? password,
+    String? mainCity,
+    String? preferredCity,
+    String? phone,
+  }) async {
+    final user = _auth.currentUser;
+    if (user == null) throw Exception('No authenticated user found');
+
+    final idToken = await user.getIdToken();
+    if (idToken == null) throw Exception("Failed to get ID token");
+
+    final cleanBaseUrl = _baseUrl.endsWith('/') ? _baseUrl.substring(0, _baseUrl.length - 1) : _baseUrl;
+    final url = Uri.parse('$cleanBaseUrl/auth/update_credentials');
+
+    final Map<String, dynamic> payload = {};
+    if (name != null && name.isNotEmpty) payload['name'] = name;
+    if (email != null && email.isNotEmpty) payload['email'] = email;
+    if (password != null && password.isNotEmpty) payload['password'] = password;
+    if (mainCity != null && mainCity.isNotEmpty) payload['mainCity'] = mainCity;
+    if (preferredCity != null && preferredCity.isNotEmpty) payload['preferredCity'] = preferredCity;
+    if (phone != null && phone.isNotEmpty) payload['phoneNumber'] = phone;
+
+    final response = await http.put(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $idToken',
+      },
+      body: jsonEncode(payload),
+    );
+
+    if (response.statusCode != 200) {
+      final result = jsonDecode(response.body);
+      throw Exception(result['message'] ?? 'Failed to update credentials');
     }
   }
 }
