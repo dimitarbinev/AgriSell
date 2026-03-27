@@ -4,7 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'storage_service.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
-import '../models/models.dart';
+
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -166,45 +166,7 @@ class AuthService {
     }
   }
 
-  Future<void> createSellerProfile({
-    required String name,
-    required String mainCity,
-    required String phone,
-  }) async {
-    final user = _auth.currentUser;
-    if (user == null) throw Exception('No authenticated user found');
 
-    final seller = Seller(
-      id: user.uid,
-      name: name,
-      mainCity: mainCity,
-      phone: phone,
-      email: user.email ?? '',
-      createdAt: DateTime.now(),
-    );
-
-    await _db.collection('sellers').doc(user.uid).set(seller.toJson());
-    await _syncTokenWithBackend(user, '/seller/profile', extraData: seller.toJson());
-  }
-
-  Future<void> createBuyerProfile({
-    required String name,
-    required String preferredCity,
-  }) async {
-    final user = _auth.currentUser;
-    if (user == null) throw Exception('No authenticated user found');
-
-    final buyer = Buyer(
-      id: user.uid,
-      name: name,
-      preferredCity: preferredCity,
-      email: user.email ?? '',
-      createdAt: DateTime.now(),
-    );
-
-    await _db.collection('buyers').doc(user.uid).set(buyer.toJson());
-    await _syncTokenWithBackend(user, '/buyer/profile', extraData: buyer.toJson());
-  }
 
   Future<void> _syncTokenWithBackend(User user, String endpoint, {Map<String, dynamic>? extraData}) async {
     if (_baseUrl.isEmpty) return;

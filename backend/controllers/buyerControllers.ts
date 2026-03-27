@@ -45,9 +45,8 @@ export const availableListings = catch_async(async (req: Request, res: Response)
                     maxCapacity: productData.maxCapacity,
                     requestedQuantity: listingData.requestedQuantity || 0,
                     city: listingData.city || productData.origin || sellerData.mainCity,
-                    date: listingData.date,
-                    startTime: listingData.startTime,
-                    endTime: listingData.endTime,
+                    startDate: listingData.startDate,
+                    endDate: listingData.endDate,
                     status: listingData.status,
                 });
             }
@@ -155,7 +154,8 @@ export const placeOrder = catch_async(async (req: Request, res: Response) => {
                 deposit: Number(deposit),
                 status: 'pending',
                 createdAt: new Date(),
-                attendanceDate: listingData.date || new Date()
+                startDate: listingData.startDate || listingData.date || new Date(),
+                endDate: listingData.endDate || listingData.date || new Date()
             });
         });
 
@@ -198,9 +198,8 @@ export const getSellerProfile = catch_async(async (req: Request, res: Response) 
                 maxCapacity: productData.maxCapacity,
                 requestedQuantity: listingData.requestedQuantity || 0,
                 city: listingData.city || productData.origin || sellerData.mainCity,
-                date: listingData.date,
-                startTime: listingData.startTime,
-                endTime: listingData.endTime,
+                startDate: listingData.startDate,
+                endDate: listingData.endDate,
                 status: listingData.status,
             });
         }
@@ -271,7 +270,8 @@ export const getMyReservations = catch_async(async (req: Request, res: Response)
             productName: productName || "Product",
             city: city || "Local",
             pricePerKg: Number(pricePerKg || 0),
-            attendanceDate: parseDate(data.attendanceDate),
+            startDate: parseDate(data.startDate || data.attendanceDate),
+            endDate: parseDate(data.endDate || data.attendanceDate),
             createdAt: parseDate(data.createdAt),
         });
     }

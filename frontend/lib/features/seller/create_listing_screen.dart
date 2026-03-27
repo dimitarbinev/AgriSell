@@ -18,9 +18,8 @@ class _CreateListingScreenState extends ConsumerState<CreateListingScreen> {
   final _priceController = TextEditingController();
   Product? _selectedProduct;
   String? _selectedCity;
-  DateTime? _selectedDate;
-  TimeOfDay? _startTime;
-  TimeOfDay? _endTime;
+  DateTime? _startDate;
+  DateTime? _endDate;
   bool _isLoading = false;
 
   @override
@@ -29,12 +28,17 @@ class _CreateListingScreenState extends ConsumerState<CreateListingScreen> {
     super.dispose();
   }
 
-  void _pickDate() async {
+  void _pickDate(bool isStart) async {
+    final now = DateTime.now();
+    final initialDate = isStart 
+        ? now.add(const Duration(days: 1))
+        : (_startDate?.add(const Duration(days: 1)) ?? now.add(const Duration(days: 2)));
+
     final date = await showDatePicker(
       context: context,
-      initialDate: DateTime.now().add(const Duration(days: 1)),
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 90)),
+      initialDate: initialDate,
+      firstDate: now,
+      lastDate: now.add(const Duration(days: 180)),
       builder: (ctx, child) => Theme(
         data: AppTheme.darkTheme.copyWith(
           colorScheme: AppTheme.darkTheme.colorScheme.copyWith(
@@ -45,26 +49,16 @@ class _CreateListingScreenState extends ConsumerState<CreateListingScreen> {
         child: child!,
       ),
     );
-    if (date != null) setState(() => _selectedDate = date);
-  }
 
-  void _pickTime(bool isStart) async {
-    final time = await showTimePicker(
-      context: context,
-      initialTime: isStart
-          ? const TimeOfDay(hour: 8, minute: 0)
-          : const TimeOfDay(hour: 14, minute: 0),
-      builder: (ctx, child) => Theme(
-        data: AppTheme.darkTheme,
-        child: child!,
-      ),
-    );
-    if (time != null) {
+    if (date != null) {
       setState(() {
         if (isStart) {
-          _startTime = time;
+          _startDate = date;
+          if (_endDate != null && _endDate!.isBefore(date)) {
+            _endDate = date.add(const Duration(days: 1));
+          }
         } else {
-          _endTime = time;
+          _endDate = date;
         }
       });
     }
@@ -73,9 +67,8 @@ class _CreateListingScreenState extends ConsumerState<CreateListingScreen> {
   Future<void> _handleCreate() async {
     if (_selectedProduct == null ||
         _selectedCity == null ||
-        _selectedDate == null ||
-        _startTime == null ||
-        _endTime == null) {
+        _startDate == null ||
+        _endDate == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please fill in all fields')),
       );
@@ -85,15 +78,11 @@ class _CreateListingScreenState extends ConsumerState<CreateListingScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final startTimeStr = '${_startTime!.hour.toString().padLeft(2, '0')}:${_startTime!.minute.toString().padLeft(2, '0')}';
-      final endTimeStr = '${_endTime!.hour.toString().padLeft(2, '0')}:${_endTime!.minute.toString().padLeft(2, '0')}';
-
       await ref.read(productServiceProvider).confirmListing(
             productId: _selectedProduct!.id,
             city: _selectedCity!,
-            date: _selectedDate!,
-            startTime: startTimeStr,
-            endTime: endTimeStr,
+            startDate: _startDate!,
+            endDate: _endDate!,
           );
 
       if (mounted) {
@@ -164,7 +153,7 @@ class _CreateListingScreenState extends ConsumerState<CreateListingScreen> {
 
 
               DropdownButtonFormField<String>(
-                initialValue: _selectedCity,
+                value: _selectedCity,
                 decoration: const InputDecoration(
                   labelText: 'City',
                   prefixIcon: Icon(Icons.location_on_outlined, size: 20),
@@ -176,46 +165,25 @@ class _CreateListingScreenState extends ConsumerState<CreateListingScreen> {
                 onChanged: (v) => setState(() => _selectedCity = v),
               ),
               const SizedBox(height: 16),
-
-              // Date
-              GestureDetector(
-                onTap: _pickDate,
-                child: InputDecorator(
-                  decoration: const InputDecoration(
-                    labelText: 'Date',
-                    prefixIcon: Icon(Icons.calendar_today, size: 20),
-                  ),
-                  child: Text(
-                    _selectedDate != null
-                        ? DateFormat('EEEE, MMM d, y').format(_selectedDate!)
-                        : 'Select date',
-                    style: TextStyle(
-                      color: _selectedDate != null
-                          ? AppTheme.textPrimary
-                          : AppTheme.textTertiary,
-                    ),
-                  ),
-                ),
-              ),
               const SizedBox(height: 16),
 
-              // Time range
+              // Date range
               Row(
                 children: [
                   Expanded(
                     child: GestureDetector(
-                      onTap: () => _pickTime(true),
+                      onTap: () => _pickDate(true),
                       child: InputDecorator(
                         decoration: const InputDecoration(
-                          labelText: 'Start Time',
-                          prefixIcon: Icon(Icons.access_time, size: 20),
+                          labelText: 'Start Date',
+                          prefixIcon: Icon(Icons.calendar_today, size: 20),
                         ),
                         child: Text(
-                          _startTime != null
-                              ? _startTime!.format(context)
+                          _startDate != null
+                              ? DateFormat('MMM d, y').format(_startDate!)
                               : 'Start',
                           style: TextStyle(
-                            color: _startTime != null
+                            color: _startDate != null
                                 ? AppTheme.textPrimary
                                 : AppTheme.textTertiary,
                           ),
@@ -226,18 +194,18 @@ class _CreateListingScreenState extends ConsumerState<CreateListingScreen> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: GestureDetector(
-                      onTap: () => _pickTime(false),
+                      onTap: () => _pickDate(false),
                       child: InputDecorator(
                         decoration: const InputDecoration(
-                          labelText: 'End Time',
-                          prefixIcon: Icon(Icons.access_time, size: 20),
+                          labelText: 'End Date',
+                          prefixIcon: Icon(Icons.calendar_today, size: 20),
                         ),
                         child: Text(
-                          _endTime != null
-                              ? _endTime!.format(context)
+                          _endDate != null
+                              ? DateFormat('MMM d, y').format(_endDate!)
                               : 'End',
                           style: TextStyle(
-                            color: _endTime != null
+                            color: _endDate != null
                                 ? AppTheme.textPrimary
                                 : AppTheme.textTertiary,
                           ),

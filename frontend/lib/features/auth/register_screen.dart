@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme.dart';
+import '../../core/constants.dart';
 import '../../shared/providers/providers.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
@@ -15,26 +16,35 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  final _nameController = TextEditingController();
+  final _phoneController = TextEditingController();
+  String? _selectedCity;
   String? _selectedRole;
   bool _obscurePassword = true;
-
+  bool _isLoading = false;
 
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
+    _nameController.dispose();
+    _phoneController.dispose();
     super.dispose();
   }
 
   Future<void> _handleRegister() async {
     if (_selectedRole == null) return;
-    
+
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
     final confirmPassword = _confirmPasswordController.text.trim();
+    final name = _nameController.text.trim();
+    final phone = _phoneController.text.trim();
+    final city = _selectedCity;
 
-    if (email.isEmpty || password.isEmpty || confirmPassword.isEmpty) {
+    if (email.isEmpty || password.isEmpty || confirmPassword.isEmpty || 
+        name.isEmpty || city == null || phone.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please fill in all fields')),
       );
@@ -48,17 +58,38 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       return;
     }
 
+    setState(() => _isLoading = true);
 
-    ref.read(registrationDataProvider.notifier).updateData({
-      'email': email,
-      'password': password,
-      'role': _selectedRole!,
-    });
+    try {
+      await ref.read(authServiceProvider).signUp(
+        name: name,
+        email: email,
+        password: password,
+        role: _selectedRole!,
+        mainCity: city,
+        phoneNumber: phone,
+        preferredCity: city,
+      );
 
-    if (_selectedRole == 'seller') {
-      context.go('/onboarding/seller');
-    } else {
-      context.go('/onboarding/buyer');
+      await ref.read(authServiceProvider).signIn(email, password);
+
+      if (mounted) {
+        if (_selectedRole == 'seller') {
+          context.go('/seller/dashboard');
+        } else {
+          context.go('/buyer/home');
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Registration failed: ${e.toString()}')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -136,6 +167,15 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     TextField(
+                      controller: _nameController,
+                      style: const TextStyle(color: AppTheme.textPrimary),
+                      decoration: const InputDecoration(
+                        labelText: 'Full Name',
+                        prefixIcon: Icon(Icons.person_outline, size: 20),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
                       controller: _emailController,
                       keyboardType: TextInputType.emailAddress,
                       style: const TextStyle(color: AppTheme.textPrimary),
@@ -174,7 +214,30 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                         prefixIcon: Icon(Icons.lock_outline, size: 20),
                       ),
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 16),
+                    DropdownButtonFormField<String>(
+                      value: _selectedCity,
+                      decoration: InputDecoration(
+                        labelText: _selectedRole == 'seller' ? 'Main City' : 'Preferred City',
+                        prefixIcon: const Icon(Icons.location_on_outlined, size: 20),
+                      ),
+                      dropdownColor: AppTheme.cardSurface,
+                      items: AppConstants.cities
+                          .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                          .toList(),
+                      onChanged: (v) => setState(() => _selectedCity = v),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: _phoneController,
+                      keyboardType: TextInputType.phone,
+                      style: const TextStyle(color: AppTheme.textPrimary),
+                      decoration: const InputDecoration(
+                        labelText: 'Phone Number',
+                        prefixIcon: Icon(Icons.phone_outlined, size: 20),
+                      ),
+                    ),
+                    const SizedBox(height: 32),
 
                     Container(
                       height: 52,
@@ -189,13 +252,24 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                             BorderRadius.circular(AppTheme.radiusMedium),
                       ),
                       child: ElevatedButton(
-                        onPressed: _selectedRole != null ? _handleRegister : null,
+                        onPressed: _selectedRole != null
+                            ? (_isLoading ? null : _handleRegister)
+                            : null,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.transparent,
                           shadowColor: Colors.transparent,
                           disabledBackgroundColor: Colors.transparent,
                         ),
-                        child: const Text('Continue'),
+                        child: _isLoading
+                            ? const SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.5,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text('Sign Up'),
                       ),
                     ),
                   ],
@@ -284,3 +358,4 @@ class _RoleCard extends StatelessWidget {
     );
   }
 }
+

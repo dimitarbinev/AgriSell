@@ -5,14 +5,18 @@ import {catch_async} from "../middleware/middleware"
 
 
 export const register = catch_async(async (req: Request, res: Response) => {
+    console.log("Registration request body:", JSON.stringify(req.body, null, 2));
     const {email, password, name, role} = req.body;
 
-    if(!email || !password || !name) {
-        return res.status(400).json({message: "All fields are required"})
-    }
-
-    if(!role) {
-        return res.status(400).json({message: "Invalid role"})
+    if(!email || !password || !name || !role) {
+        const missing = [];
+        if(!email) missing.push('email');
+        if(!password) missing.push('password');
+        if(!name) missing.push('name');
+        if(!role) missing.push('role');
+        return res.status(400).json({
+            message: `Missing fields: ${missing.join(', ')}. Received keys: ${Object.keys(req.body).join(', ')}`
+        });
     }
 
     const userRecord = await admin.auth().createUser({
@@ -24,27 +28,32 @@ export const register = catch_async(async (req: Request, res: Response) => {
     const uid = userRecord.uid;
 
     if(role === "seller"){
-      await db.collection('users').doc(uid).set({
+      const baseData = {
         name,
         email,
-        password,
         role,
         mainCity: req.body.mainCity,
         phoneNumber: req.body.phoneNumber,
         createdAt: new Date()
+      };
+      await db.collection('users').doc(uid).set(baseData)
+      await db.collection('sellers').doc(uid).set({
+        ...baseData,
+        phone: req.body.phoneNumber // Seller model uses 'phone'
       })
     }
 
     if(role === "buyer"){
-      await db.collection('users').doc(uid).set({
+      const baseData = {
         name,
         email,
-        password,
         role,
         phoneNumber: req.body.phoneNumber,
         preferredCity: req.body.preferredCity,
         createdAt: new Date()
-      })
+      };
+      await db.collection('users').doc(uid).set(baseData)
+      await db.collection('buyers').doc(uid).set(baseData)
     }
 
     return res.status(200).json({message: "User registered successfully"})

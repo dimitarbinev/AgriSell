@@ -47,9 +47,9 @@ export const productListing = catch_async(async (req: Request, res: Response) =>
 })
 
 export const listingConfirmation = catch_async(async (req: Request, res: Response) => {
-    const {productId, date, startTime, endTime} = req.body;
+    const {productId, startDate, endDate} = req.body;
 
-    if(!productId || !date || !startTime || !endTime) {
+    if(!productId || !startDate || !endDate) {
         return res.status(400).json({message: "Invalid request"})
     }
 
@@ -66,9 +66,8 @@ export const listingConfirmation = catch_async(async (req: Request, res: Respons
     }
 
     await db.collection("users").doc(uid).collection('products').doc(productId).collection("listings").add({
-        date,
-        startTime,
-        endTime,
+        startDate,
+        endDate,
         status: Status.active,
         updatedAt: new Date()
     })
@@ -102,9 +101,8 @@ export const getListings = catch_async(async (req: Request, res: Response) => {
                 productName: productData.productName,
                 productCategory: productData.category,
                 city: listingData.city || '',
-                date: listingData.date,
-                startTime: listingData.startTime,
-                endTime: listingData.endTime,
+                startDate: listingData.startDate,
+                endDate: listingData.endDate,
                 pricePerKg: productData.pricePerKg,
                 availableQuantity: productData.maxCapacity,
                 minThreshold: productData.minThreshold,
@@ -144,4 +142,3 @@ export const updateListingStatus = catch_async(async (req: Request, res: Respons
 
     return res.status(200).json({ message: "Listing status updated successfully" });
 });
-

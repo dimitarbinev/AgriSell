@@ -6,8 +6,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'features/auth/splash_screen.dart';
 import 'features/auth/login_screen.dart';
 import 'features/auth/register_screen.dart';
-import 'features/auth/seller_onboarding_screen.dart';
-import 'features/auth/buyer_onboarding_screen.dart';
 import 'features/seller/seller_shell.dart';
 import 'features/seller/seller_dashboard_screen.dart';
 import 'features/seller/add_product_screen.dart';
@@ -56,14 +54,6 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/register',
         builder: (context, state) => const RegisterScreen(),
-      ),
-      GoRoute(
-        path: '/onboarding/seller',
-        builder: (context, state) => const SellerOnboardingScreen(),
-      ),
-      GoRoute(
-        path: '/onboarding/buyer',
-        builder: (context, state) => const BuyerOnboardingScreen(),
       ),
       GoRoute(
         path: '/notifications',

@@ -52,21 +52,7 @@ final userRoleProvider = Provider<String?>((ref) {
   return profile?['role'] as String?;
 });
 
-// ─── Registration Data ───
-class RegistrationDataNotifier extends Notifier<Map<String, String>> {
-  @override
-  Map<String, String> build() => {};
 
-  void updateData(Map<String, String> data) {
-    state = {...state, ...data};
-  }
-
-  void clear() => state = {};
-}
-
-final registrationDataProvider =
-    NotifierProvider<RegistrationDataNotifier, Map<String, String>>(
-        RegistrationDataNotifier.new);
 
 // ─── Current Seller Profile ───
 final reactiveSellerProvider = StreamProvider<Seller?>((ref) {
@@ -120,8 +106,8 @@ final currentBuyerProvider = StreamProvider<Buyer?>((ref) {
 });
 
 // ─── All Active Listings (Backend Powered) ───
-final activeListingsProvider = StreamProvider<List<Listing>>((ref) async* {
-  yield await ref.watch(productServiceProvider).getAvailableListings();
+final activeListingsProvider = FutureProvider<List<Listing>>((ref) {
+  return ref.watch(productServiceProvider).getAvailableListings();
 });
 
 // ─── Seller's Listings ───

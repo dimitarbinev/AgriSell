@@ -19,6 +19,34 @@ class AppConstants {
   ];
 
   // ─── Bulgarian Cities ───
+  static const List<String> cities = [
+    'Sofia',
+    'Plovdiv',
+    'Varna',
+    'Burgas',
+    'Ruse',
+    'Stara Zagora',
+    'Pleven',
+    'Sliven',
+    'Dobrich',
+    'Shumen',
+    'Pernik',
+    'Haskovo',
+    'Yambol',
+    'Pazardzhik',
+    'Blagoevgrad',
+    'Veliko Tarnovo',
+    'Vratsa',
+    'Gabrovo',
+    'Asenovgrad',
+    'Vidin',
+    'Kazanlak',
+    'Kyustendil',
+    'Montana',
+    'Dimitrovgrad',
+    'Lovech',
+  ];
+
   static const Map<String, ({double lat, double lng})> cityLocations = {
     'Sofia': (lat: 42.6977, lng: 23.3219),
     'Plovdiv': (lat: 42.1354, lng: 24.7453),
@@ -46,6 +74,8 @@ class AppConstants {
     'Dimitrovgrad': (lat: 42.0641, lng: 25.5721),
     'Lovech': (lat: 43.1333, lng: 24.7167),
   };
+
+  static List<String> get cities => cityLocations.keys.toList()..sort();
 
   // ─── Seasons ───
   static const List<String> seasons = [

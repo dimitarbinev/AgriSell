@@ -95,9 +95,8 @@ class ProductService {
   Future<void> confirmListing({
     required String productId,
     required String city,
-    required DateTime date,
-    required String startTime,
-    required String endTime,
+    required DateTime startDate,
+    required DateTime endDate,
   }) async {
     final user = _auth.currentUser;
     if (user == null) throw Exception('No authenticated user found');
@@ -111,9 +110,8 @@ class ProductService {
     final payload = {
       'productId': productId,
       'city': city,
-      'date': date.toIso8601String(),
-      'startTime': startTime,
-      'endTime': endTime,
+      'startDate': startDate.toIso8601String(),
+      'endDate': endDate.toIso8601String(),
     };
 
     final response = await http.post(

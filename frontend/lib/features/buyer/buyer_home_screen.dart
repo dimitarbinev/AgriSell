@@ -132,38 +132,72 @@ class _BuyerHomeScreenState extends ConsumerState<BuyerHomeScreen> {
             ),
             const SizedBox(height: 12),
             Expanded(
-              child: ref.watch(activeListingsProvider).when(
-                data: (listings) {
-                  final filtered = listings.where((l) {
-                    final matchesCategory = _selectedCategory == null || l.productCategory == _selectedCategory;
-                    final matchesSearch = _searchController.text.isEmpty ||
-                        l.productName.toLowerCase().contains(_searchController.text.toLowerCase()) ||
-                        l.city.toLowerCase().contains(_searchController.text.toLowerCase());
-                    return matchesCategory && matchesSearch;
-                  }).toList();
-
-                  if (filtered.isEmpty) {
-                    return const Center(child: Text('No listings found', style: TextStyle(color: AppTheme.textSecondary)));
-                  }
-
-                  return ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    itemCount: filtered.length,
-                    itemBuilder: (ctx, i) => ListingCard(
-                      listing: filtered[i],
-                      onTap: () => context.go('/buyer/listing/${filtered[i].id}'),
-                    ),
-                  );
+              child: RefreshIndicator(
+                onRefresh: () async {
+                  ref.invalidate(activeListingsProvider);
                 },
-                loading: () => const Center(child: CircularProgressIndicator()),
-                error: (err, stack) => Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Text(
-                      'Error: $err\n\nNote: If this is an index error, please click the link in the debug console to create it.',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(color: AppTheme.statusCancelled),
-                    ),
+                color: AppTheme.primaryGreen,
+                child: ref.watch(activeListingsProvider).when(
+                  data: (listings) {
+                    final filtered = listings.where((l) {
+                      final matchesCategory = _selectedCategory == null || l.productCategory == _selectedCategory;
+                      final matchesSearch = _searchController.text.isEmpty ||
+                          l.productName.toLowerCase().contains(_searchController.text.toLowerCase()) ||
+                          l.city.toLowerCase().contains(_searchController.text.toLowerCase());
+                      return matchesCategory && matchesSearch;
+                    }).toList();
+
+                    if (filtered.isEmpty) {
+                      return ListView(
+                        children: const [
+                          SizedBox(height: 100),
+                          Center(child: Text('No listings found', style: TextStyle(color: AppTheme.textSecondary))),
+                          Center(child: Padding(
+                            padding: EdgeInsets.only(top: 8),
+                            child: Text('Pull down to refresh', style: TextStyle(color: AppTheme.textTertiary, fontSize: 12)),
+                          )),
+                        ],
+                      );
+                    }
+
+                    return ListView.builder(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      itemCount: filtered.length,
+                      itemBuilder: (ctx, i) => ListingCard(
+                        listing: filtered[i],
+                        onTap: () => context.go('/buyer/listing/${filtered[i].id}'),
+                      ),
+                    );
+                  },
+                  loading: () => const Center(child: CircularProgressIndicator()),
+                  error: (err, stack) => ListView(
+                    children: [
+                      const SizedBox(height: 80),
+                      Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(20),
+                          child: Column(
+                            children: [
+                              const Icon(Icons.cloud_off, size: 48, color: AppTheme.textTertiary),
+                              const SizedBox(height: 12),
+                              Text(
+                                'Could not load listings.\nCheck that the backend is running.',
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(color: AppTheme.textSecondary),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                '$err',
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(color: AppTheme.statusCancelled, fontSize: 11),
+                              ),
+                              const SizedBox(height: 12),
+                              const Text('Pull down to retry', style: TextStyle(color: AppTheme.textTertiary, fontSize: 12)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
