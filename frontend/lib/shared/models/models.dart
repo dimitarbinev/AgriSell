@@ -36,7 +36,7 @@ class Seller {
       phone: json['phone'] as String? ?? '',
       email: json['email'] as String? ?? '',
       rating: (json['rating'] as num?)?.toDouble() ?? 0.0,
-      totalReviews: (json['totalReviews'] ?? json['reviewCount']) as int? ?? 0,
+      totalReviews: (json['totalReviews'] ?? json['reviewCount'] as num?)?.toInt() ?? 0,
       completedOrders: json['completedOrders'] as int? ?? 0,
       cancelRate: (json['cancelRate'] as num?)?.toDouble() ?? 0.0,
       createdAt: (json['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
