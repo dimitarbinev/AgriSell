@@ -61,7 +61,7 @@ class MyReservationsScreen extends ConsumerWidget {
                                     children: [
                                       Text(r.productName?.isNotEmpty == true ? r.productName! : 'Product',
                                           style: const TextStyle(fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
-                                      Text('${r.city ?? 'Local'} · ${DateFormat('MMM d').format(r.attendanceDate)}',
+                                      Text('${r.city ?? 'Local'} · ${DateFormat('MMM d').format(r.startDate)} - ${DateFormat('MMM d').format(r.endDate)}',
                                           style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
                                     ],
                                   ),

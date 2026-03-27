@@ -75,6 +75,8 @@ class AppConstants {
     'Lovech': (lat: 43.1333, lng: 24.7167),
   };
 
+  static List<String> get cities => cityLocations.keys.toList()..sort();
+
   // ─── Seasons ───
   static const List<String> seasons = [
     'Spring',

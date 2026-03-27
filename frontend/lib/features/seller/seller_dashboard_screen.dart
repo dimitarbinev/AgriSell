@@ -174,10 +174,10 @@ class SellerDashboardScreen extends ConsumerWidget {
                         final startOfToday = DateTime(today.year, today.month, today.day);
                         
                         final sortedListings = listings
-                            .where((l) => l.date.isAfter(startOfToday.subtract(const Duration(seconds: 1))))
+                            .where((l) => l.endDate.isAfter(startOfToday.subtract(const Duration(seconds: 1))))
                             .toList();
                             
-                        sortedListings.sort((a, b) => a.date.compareTo(b.date));
+                        sortedListings.sort((a, b) => a.startDate.compareTo(b.startDate));
                         
                         if (sortedListings.isEmpty) {
                           return const Center(
@@ -354,9 +354,8 @@ final _sampleListings = [
     productName: 'Fresh Tomatoes',
     productCategory: 'Vegetables',
     city: 'Sofia',
-    date: DateTime.now().add(const Duration(days: 2)),
-    startTime: '08:00',
-    endTime: '14:00',
+    startDate: DateTime.now().add(const Duration(days: 2)),
+    endDate: DateTime.now().add(const Duration(days: 5)),
     pricePerKg: 3.50,
     availableQuantity: 200,
     minThreshold: 100,
@@ -370,9 +369,8 @@ final _sampleListings = [
     productName: 'Organic Apples',
     productCategory: 'Fruits',
     city: 'Plovdiv',
-    date: DateTime.now().add(const Duration(days: 3)),
-    startTime: '09:00',
-    endTime: '15:00',
+    startDate: DateTime.now().add(const Duration(days: 3)),
+    endDate: DateTime.now().add(const Duration(days: 6)),
     pricePerKg: 2.80,
     availableQuantity: 150,
     minThreshold: 80,
@@ -386,9 +384,8 @@ final _sampleListings = [
     productName: 'Sunflower Honey',
     productCategory: 'Honey',
     city: 'Varna',
-    date: DateTime.now().add(const Duration(days: 5)),
-    startTime: '10:00',
-    endTime: '16:00',
+    startDate: DateTime.now().add(const Duration(days: 5)),
+    endDate: DateTime.now().add(const Duration(days: 8)),
     pricePerKg: 12.00,
     availableQuantity: 50,
     minThreshold: 30,

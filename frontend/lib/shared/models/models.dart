@@ -155,9 +155,8 @@ class Listing {
   final String productName;
   final String productCategory;
   final String city;
-  final DateTime date;
-  final String startTime;
-  final String endTime;
+  final DateTime startDate;
+  final DateTime endDate;
   final double pricePerKg;
   final double availableQuantity;
   final double minThreshold;
@@ -177,9 +176,8 @@ class Listing {
     required this.productName,
     required this.productCategory,
     required this.city,
-    required this.date,
-    required this.startTime,
-    required this.endTime,
+    required this.startDate,
+    required this.endDate,
     required this.pricePerKg,
     required this.availableQuantity,
     required this.minThreshold,
@@ -201,11 +199,8 @@ class Listing {
       productName: json['productName'] as String? ?? '',
       productCategory: (json['productCategory'] ?? json['category']) as String? ?? '',
       city: json['city'] as String? ?? '',
-      date: json['date'] is String 
-          ? DateTime.parse(json['date'] as String) 
-          : (json['date'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      startTime: json['startTime'] as String? ?? '',
-      endTime: json['endTime'] as String? ?? '',
+      startDate: _parseDateTime(json['startDate'], _parseDateTime(json['date'])),
+      endDate: _parseDateTime(json['endDate']),
       pricePerKg: (json['pricePerKg'] as num?)?.toDouble() ?? 0.0,
       availableQuantity:
           (json['availableQuantity'] ?? json['maxCapacity'] ?? 0) is num
@@ -255,11 +250,8 @@ class Listing {
       productName: productData['productName'] as String? ?? '',
       productCategory: productData['category'] as String? ?? '',
       city: (listingData['city'] ?? productData['origin'] ?? productData['mainCity']) as String? ?? '',
-      date: listingData['date'] is String
-          ? DateTime.parse(listingData['date'] as String)
-          : (listingData['date'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      startTime: listingData['startTime'] as String? ?? '',
-      endTime: listingData['endTime'] as String? ?? '',
+      startDate: _parseDateTime(listingData['startDate'], _parseDateTime(listingData['date'])),
+      endDate: _parseDateTime(listingData['endDate']),
       pricePerKg: (productData['pricePerKg'] as num?)?.toDouble() ?? 0.0,
       availableQuantity: (productData['maxCapacity'] as num?)?.toDouble() ?? 0.0,
       minThreshold: (productData['minThreshold'] as num?)?.toDouble() ?? 0.0,
@@ -279,9 +271,8 @@ class Listing {
     'productName': productName,
     'productCategory': productCategory,
     'city': city,
-    'date': Timestamp.fromDate(date),
-    'startTime': startTime,
-    'endTime': endTime,
+    'startDate': Timestamp.fromDate(startDate),
+    'endDate': Timestamp.fromDate(endDate),
     'pricePerKg': pricePerKg,
     'availableQuantity': availableQuantity,
     'minThreshold': minThreshold,
@@ -307,7 +298,8 @@ class Reservation {
   final String listingId;
   final double quantity;
   final double deposit;
-  final DateTime attendanceDate;
+  final DateTime startDate;
+  final DateTime endDate;
   final String status;
   final String? buyerName;
   final String? productName;
@@ -320,7 +312,8 @@ class Reservation {
     required this.listingId,
     required this.quantity,
     required this.deposit,
-    required this.attendanceDate,
+    required this.startDate,
+    required this.endDate,
     this.status = 'pending',
     this.buyerName,
     this.productName,
@@ -335,9 +328,8 @@ class Reservation {
       listingId: json['listingId'] as String? ?? '',
       quantity: (json['quantity'] as num?)?.toDouble() ?? 0.0,
       deposit: (json['deposit'] as num?)?.toDouble() ?? 0.0,
-      attendanceDate: json['attendanceDate'] is String
-          ? DateTime.parse(json['attendanceDate'] as String)
-          : (json['attendanceDate'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      startDate: _parseDateTime(json['startDate'], _parseDateTime(json['attendanceDate'])),
+      endDate: _parseDateTime(json['endDate'], _parseDateTime(json['attendanceDate'])),
       status: json['status'] as String? ?? 'pending',
       buyerName: json['buyerName'] as String?,
       productName: json['productName'] as String?,
@@ -351,7 +343,8 @@ class Reservation {
     'listingId': listingId,
     'quantity': quantity,
     'deposit': deposit,
-    'attendanceDate': Timestamp.fromDate(attendanceDate),
+    'startDate': Timestamp.fromDate(startDate),
+    'endDate': Timestamp.fromDate(endDate),
     'status': status,
     'buyerName': buyerName,
     'productName': productName,
@@ -386,7 +379,7 @@ class Review {
       sellerId: json['sellerId'] as String? ?? '',
       rating: (json['rating'] as num?)?.toDouble() ?? 0.0,
       comment: json['comment'] as String? ?? '',
-      createdAt: (json['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      createdAt: _parseDateTime(json['createdAt']),
       buyerName: json['buyerName'] as String?,
     );
   }
@@ -431,7 +424,7 @@ class AppNotification {
       type: json['type'] as String? ?? '',
       referenceId: json['referenceId'] as String?,
       read: json['read'] as bool? ?? false,
-      createdAt: (json['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      createdAt: _parseDateTime(json['createdAt']),
     );
   }
 
@@ -444,4 +437,18 @@ class AppNotification {
     'read': read,
     'createdAt': Timestamp.fromDate(createdAt),
   };
+}
+
+DateTime _parseDateTime(dynamic value, [DateTime? defaultValue]) {
+  if (value == null) return defaultValue ?? DateTime.now();
+  if (value is DateTime) return value;
+  if (value is Timestamp) return value.toDate();
+  if (value is String) {
+    try {
+      return DateTime.parse(value);
+    } catch (_) {
+      return defaultValue ?? DateTime.now();
+    }
+  }
+  return defaultValue ?? DateTime.now();
 }

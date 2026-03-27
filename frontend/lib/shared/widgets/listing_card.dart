@@ -132,19 +132,7 @@ class ListingCard extends StatelessWidget {
                                     size: 10, color: AppTheme.accentGreen.withValues(alpha: 0.8)),
                                   const SizedBox(width: 4),
                                   Text(
-                                    DateFormat('MMM d').format(listing.date),
-                                    style: const TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w600,
-                                      color: AppTheme.accentGreen,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Icon(Icons.access_time_outlined, 
-                                    size: 10, color: AppTheme.accentGreen.withValues(alpha: 0.8)),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    '${listing.startTime} - ${listing.endTime}',
+                                    '${DateFormat('MMM d').format(listing.startDate)} - ${DateFormat('MMM d').format(listing.endDate)}',
                                     style: const TextStyle(
                                       fontSize: 11,
                                       fontWeight: FontWeight.w600,
