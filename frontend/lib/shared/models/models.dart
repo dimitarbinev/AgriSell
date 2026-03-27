@@ -326,6 +326,7 @@ class Reservation {
   });
 
   factory Reservation.fromJson(Map<String, dynamic> json, String id) {
+    final rawStatus = json['status'] as String?;
     return Reservation(
       id: id,
       buyerId: json['buyerId'] as String? ?? '',
@@ -334,7 +335,7 @@ class Reservation {
       deposit: (json['deposit'] as num?)?.toDouble() ?? 0.0,
       startDate: _parseDateTime(json['startDate'], _parseDateTime(json['attendanceDate'])),
       endDate: _parseDateTime(json['endDate'], _parseDateTime(json['attendanceDate'])),
-      status: json['status'] as String? ?? 'pending',
+      status: rawStatus == 'pending' ? 'active' : (rawStatus ?? 'active'),
       buyerName: json['buyerName'] as String?,
       productName: json['productName'] as String?,
       city: json['city'] as String?,

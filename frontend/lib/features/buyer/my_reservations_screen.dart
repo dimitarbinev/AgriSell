@@ -12,7 +12,7 @@ class MyReservationsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final reservationsAsync = ref.watch(backendBuyerReservationsProvider);
+    final reservationsAsync = ref.watch(myReservationsProvider);
 
     return NatureScaffold(
       body: Column(

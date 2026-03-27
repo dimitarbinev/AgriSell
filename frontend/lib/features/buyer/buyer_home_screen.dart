@@ -26,6 +26,8 @@ class _BuyerHomeScreenState extends ConsumerState<BuyerHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final currentUserId = ref.watch(authStateProvider).value?.uid;
+
     return NatureScaffold(
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -177,11 +179,12 @@ class _BuyerHomeScreenState extends ConsumerState<BuyerHomeScreen> {
               child: ref.watch(activeListingsProvider).when(
                     data: (listings) {
                       final filtered = listings.where((l) {
+                        final isOwnListing = currentUserId != null && l.sellerId == currentUserId;
                         final matchesCategory = _selectedCategory == null || l.productCategory == _selectedCategory;
                         final matchesSearch = _searchController.text.isEmpty ||
                             l.productName.toLowerCase().contains(_searchController.text.toLowerCase()) ||
                             l.city.toLowerCase().contains(_searchController.text.toLowerCase());
-                        return matchesCategory && matchesSearch;
+                        return !isOwnListing && matchesCategory && matchesSearch;
                       }).toList();
 
                       if (filtered.isEmpty) {
