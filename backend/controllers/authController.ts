@@ -6,7 +6,7 @@ import {catch_async} from "../middleware/middleware"
 
 export const register = catch_async(async (req: Request, res: Response) => {
     console.log("Registration request body:", JSON.stringify(req.body, null, 2));
-    const {email, password, name, role} = req.body;
+    const {email, password, name, role, city, phone} = req.body;
 
     if(!email || !password || !name || !role) {
         const missing = [];
@@ -27,34 +27,15 @@ export const register = catch_async(async (req: Request, res: Response) => {
 
     const uid = userRecord.uid;
 
-    if(role === "seller"){
-      const baseData = {
+    await db.collection('users').doc(uid).set({
         name,
         email,
+        password,
         role,
-        mainCity: req.body.mainCity,
-        phoneNumber: req.body.phoneNumber,
+        city,
+        phone,
         createdAt: new Date()
-      };
-      await db.collection('users').doc(uid).set(baseData)
-      await db.collection('sellers').doc(uid).set({
-        ...baseData,
-        phone: req.body.phoneNumber // Seller model uses 'phone'
-      })
-    }
-
-    if(role === "buyer"){
-      const baseData = {
-        name,
-        email,
-        role,
-        phoneNumber: req.body.phoneNumber,
-        preferredCity: req.body.preferredCity,
-        createdAt: new Date()
-      };
-      await db.collection('users').doc(uid).set(baseData)
-      await db.collection('buyers').doc(uid).set(baseData)
-    }
+    })
 
     return res.status(200).json({message: "User registered successfully"})
 
@@ -84,10 +65,10 @@ export const changeRole = catch_async(async (req: Request, res: Response) => {
         return res.status(400).json({message: "Invalid role"})
     }
 
-    await db.collection('users').doc(uid).update({
+    await db.collection('users').doc(uid).set({
         role,
         updatedAt: new Date()
-    })
+    }, { merge: true })
 
     return res.status(200).json({message: "Role changed successfully"})
 })
@@ -105,7 +86,7 @@ export const getProfileName = catch_async(async (req: Request, res: Response) =>
 
 export const updateCredentials = catch_async(async (req: Request, res: Response) => {
     const uid = req.user?.uid as string;
-    const { email, password, name, preferredCity, mainCity, phoneNumber } = req.body;
+    const { email, password, name, city, phone } = req.body;
 
     const authUpdates: any = {};
     if (email) authUpdates.email = email;
@@ -120,38 +101,15 @@ export const updateCredentials = catch_async(async (req: Request, res: Response)
     if (!doc.exists) {
         return res.status(404).json({ message: "User not found" });
     }
-    const role = doc.data()?.role;
 
     const firestoreUpdates: any = { updatedAt: new Date() };
     if (name) firestoreUpdates.name = name;
     if (email) firestoreUpdates.email = email;
     if (password) firestoreUpdates.password = password;
-    if (phoneNumber) firestoreUpdates.phoneNumber = phoneNumber;
-    if (role === 'seller' && mainCity) firestoreUpdates.mainCity = mainCity;
-    if (role === 'buyer' && preferredCity) firestoreUpdates.preferredCity = preferredCity;
+    if (phone) firestoreUpdates.phone = phone;
+    if (city) firestoreUpdates.city = city;
 
     await db.collection('users').doc(uid).update(firestoreUpdates);
-
-    if (role === 'seller') {
-        const sellerUpdates: any = {};
-        if (name) sellerUpdates.name = name;
-        if (mainCity) sellerUpdates.mainCity = mainCity;
-        if (phoneNumber) sellerUpdates.phone = phoneNumber;
-        if (email) sellerUpdates.email = email;
-        
-        if (Object.keys(sellerUpdates).length > 0) {
-            await db.collection('sellers').doc(uid).update(sellerUpdates);
-        }
-    } else if (role === 'buyer') {
-        const buyerUpdates: any = {};
-        if (name) buyerUpdates.name = name;
-        if (preferredCity) buyerUpdates.preferredCity = preferredCity;
-        if (email) buyerUpdates.email = email;
-        
-        if (Object.keys(buyerUpdates).length > 0) {
-            await db.collection('buyers').doc(uid).update(buyerUpdates);
-        }
-    }
 
     return res.status(200).json({message: "Credentials updated successfully"});
 });

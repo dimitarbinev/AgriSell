@@ -91,7 +91,7 @@ export const placeOrder = catch_async(async (req: Request, res: Response) => {
         .collection('products').doc(productId);
 
     try {
-        await db.runTransaction(async (transaction) => {
+        const txResult = await db.runTransaction(async (transaction) => {
             const listingDoc = await transaction.get(listingRef);
             const productDoc = await transaction.get(productRef);
 
@@ -157,7 +157,30 @@ export const placeOrder = catch_async(async (req: Request, res: Response) => {
                 startDate: listingData.startDate || listingData.date || new Date(),
                 endDate: listingData.endDate || listingData.date || new Date()
             });
+
+            return {
+                productName: productData.productName || productData.name || 'Unknown Product'
+            };
         });
+
+        // Fire and forget Telegram Notification
+        try {
+            const sellerDoc = await db.collection("users").doc(sellerId).get();
+            const sellerPhone = sellerDoc.data()?.phoneNumber || sellerDoc.data()?.phone;
+            console.log(sellerPhone);
+            if (sellerPhone) {
+                const buyerPhone = userDoc.data()?.phoneNumber || userDoc.data()?.phone || "No phone provided";
+                const msg = `New Reservation!\nBuyer: ${buyerName}\nPhone: ${buyerPhone}\nProduct: ${txResult.productName}\nQuantity: ${quantity} kg\nDeposit: ${deposit}`;
+                console.log(msg);
+                fetch('https://oligarchically-unpreponderated-linda.ngrok-free.dev/send-telegram-message', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phone_number: sellerPhone, message: msg })
+                }).catch(err => console.error("[Telegram] Error sending message:", err));
+            }
+        } catch (notifErr) {
+            console.error("[Telegram] Prepare error:", notifErr);
+        }
 
         return res.status(200).json({ message: "Order placed successfully" });
     } catch (error: any) {
