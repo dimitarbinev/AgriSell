@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import { catch_async } from "../middleware/middleware";
 
-const AI_SERVICE_URL = process.env.AI_SERVICE_URL || "http://localhost:8000";
+const AI_SERVICE_URL = process.env.AI_SERVICE_URL;
 
 export const classifyProduct = catch_async(async (req: Request, res: Response) => {
     const { productName } = req.body;

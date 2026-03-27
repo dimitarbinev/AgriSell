@@ -208,7 +208,22 @@ final sellerReviewStatsProvider = Provider<AsyncValue<({double rating, int total
   });
 });
 
-final myReservationsProvider = backendBuyerReservationsProvider;
+final myReservationsProvider = StreamProvider<List<Reservation>>((ref) {
+  final user = ref.watch(authStateProvider).value;
+  if (user == null) return Stream.value([]);
+
+  return ref
+      .watch(firestoreProvider)
+      .collection('reservations')
+      .where('buyerId', isEqualTo: user.uid)
+      .snapshots()
+      .map((snap) {
+        final reservations =
+            snap.docs.map((d) => Reservation.fromJson(d.data(), d.id)).toList();
+        reservations.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        return reservations;
+      });
+});
 
 // ─── Seller Reviews ───
 final sellerReviewsProvider = StreamProvider.family<List<Review>, String>((

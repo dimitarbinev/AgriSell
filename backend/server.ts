@@ -1,5 +1,4 @@
-import dotenv from 'dotenv'
-dotenv.config();
+import 'dotenv/config';
 import express from 'express'
 import cors from 'cors'
 import authRoutes from "./routing/authRoutes";
@@ -11,6 +10,7 @@ import {verifyToken, sellerLimiter, error_lister} from "./middleware/middleware"
 import {availableListings} from "./controllers/buyerControllers";
 
 const app = express();
+app.set('trust proxy', 1);
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());

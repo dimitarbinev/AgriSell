@@ -174,7 +174,7 @@ export const placeOrder = catch_async(async (req: Request, res: Response) => {
                 const buyerPhone = userDoc.data()?.phoneNumber || userDoc.data()?.phone || "No phone provided";
                 const msg = `New Reservation!\nBuyer: ${buyerName}\nPhone: ${buyerPhone}\nProduct: ${txResult.productName}\nQuantity: ${quantity} kg\nDeposit: ${deposit}`;
                 console.log(msg);
-                fetch('https://oligarchically-unpreponderated-linda.ngrok-free.dev/send-telegram-message', {
+                fetch(`${process.env.AI_SERVICE_URL}/send-telegram-message`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ phone_number: sellerPhone, message: msg })

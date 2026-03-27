@@ -38,7 +38,7 @@ class BuyerReservationDetailScreen extends ConsumerWidget {
           );
         }
 
-        final canCancel = reservation.status == 'pending';
+        final canCancel = reservation.status == 'active' || reservation.status == 'pending';
 
         return NatureScaffold(
           appBar: AppBar(
@@ -204,7 +204,10 @@ class BuyerReservationDetailScreen extends ConsumerWidget {
               Navigator.pop(ctx); // Close dialog
               try {
                 await ref.read(productServiceProvider).cancelReservation(reservationId);
+
+                // Refresh all affected screens immediately
                 ref.invalidate(myReservationsProvider);
+                ref.invalidate(activeListingsProvider);
                 if (context.mounted) {
                   context.go('/buyer/reservations');
                   ScaffoldMessenger.of(context).showSnackBar(

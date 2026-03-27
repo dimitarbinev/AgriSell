@@ -21,12 +21,13 @@ export const productListing = catch_async(async (req: Request, res: Response) =>
     let category = productData.category;
     if (!category && productData.productName) {
         try {
-            const AI_SERVICE_URL = process.env.AI_SERVICE_URL || "http://localhost:8000";
+            const AI_SERVICE_URL = process.env.AI_SERVICE_URL;
             const aiRes = await fetch(`${AI_SERVICE_URL}/classify-product`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ product_name: productData.productName }),
             });
+            console.log(aiRes);
             if (aiRes.ok) {
                 const aiData = await aiRes.json() as any;
                 category = aiData.category;

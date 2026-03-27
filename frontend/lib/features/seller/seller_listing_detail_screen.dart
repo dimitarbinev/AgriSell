@@ -213,22 +213,27 @@ class SellerListingDetailScreen extends ConsumerWidget {
 
                 // Reservations (Using real data)
                 reservationsAsync.when(
-                  data: (reservations) => Container(
+                  data: (reservations) {
+                    final visibleReservations = reservations
+                        .where((r) => r.status == 'active' || r.status == 'confirmed')
+                        .toList();
+
+                    return Container(
                     padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
                     decoration: glassDecoration(),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Резервации (${reservations.length})',
+                        Text('Резервации (${visibleReservations.length})',
                             style: const TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.w800,
                                 color: AppTheme.textPrimary)),
                         const SizedBox(height: 18),
-                        if (reservations.isEmpty)
+                        if (visibleReservations.isEmpty)
                           const Text('Все още няма резервации',
                               style: TextStyle(color: AppTheme.textTertiary)),
-                        ...reservations.map((r) => Padding(
+                        ...visibleReservations.map((r) => Padding(
                               padding: const EdgeInsets.only(bottom: 16),
                               child: Row(
                                 children: [
@@ -262,13 +267,74 @@ class SellerListingDetailScreen extends ConsumerWidget {
                                       ],
                                     ),
                                   ),
-                                  StatusChip(status: r.status, small: true),
+                                  IconButton(
+                                    icon: const Icon(Icons.close_rounded, color: AppTheme.statusCancelled, size: 20),
+                                    splashRadius: 18,
+                                    tooltip: 'Откажи резервация',
+                                    onPressed: () async {
+                                      final shouldCancel = await showDialog<bool>(
+                                        context: context,
+                                        builder: (ctx) => AlertDialog(
+                                          backgroundColor: AppTheme.cardSurface.withValues(alpha: 0.95),
+                                          title: const Text(
+                                            'Отмяна на резервация',
+                                            style: TextStyle(color: Colors.white),
+                                          ),
+                                          content: Text(
+                                            'Сигурни ли сте, че искате да премахнете тази резервация?',
+                                            style: TextStyle(color: Colors.white.withValues(alpha: 0.8)),
+                                          ),
+                                          actions: [
+                                            TextButton(
+                                              onPressed: () => Navigator.pop(ctx, false),
+                                              child: Text(
+                                                'Не',
+                                                style: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
+                                              ),
+                                            ),
+                                            TextButton(
+                                              onPressed: () => Navigator.pop(ctx, true),
+                                              child: const Text(
+                                                'Да, премахни',
+                                                style: TextStyle(color: AppTheme.statusCancelled),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+
+                                      if (shouldCancel != true) return;
+
+                                      try {
+                                        await ref.read(productServiceProvider).cancelReservation(r.id);
+
+                                        // Refresh all dependent UI immediately (seller + buyer + listings)
+                                        ref.invalidate(listingReservationsProvider(listingId));
+                                        ref.invalidate(sellerListingsProvider(user.uid));
+                                        ref.invalidate(activeListingsProvider);
+                                        ref.invalidate(myReservationsProvider);
+
+                                        if (context.mounted) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            const SnackBar(content: Text('Резервацията е отменена успешно')),
+                                          );
+                                        }
+                                      } catch (e) {
+                                        if (context.mounted) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(content: Text('Грешка: $e')),
+                                          );
+                                        }
+                                      }
+                                    },
+                                  ),
                                 ],
                               ),
                             )),
                       ],
                     ),
-                  ),
+                  );
+                  },
                   loading: () => const Center(child: CircularProgressIndicator()),
                   error: (e, _) => Text('Грешка при зареждане: $e'),
                 ),

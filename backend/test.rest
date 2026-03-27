@@ -1,0 +1,29 @@
+# Register a seller
+POST http://localhost:3000/auth/sign_up
+Content-Type: application/json
+
+{
+    "email": "seller@example.com",
+    "password": "password123",
+    "name": "Jane Doe",
+    "role": "seller",
+    "city": "Sofia",
+    "phone": "0888123456"
+}
+
+###
+# List a product (Requires real JWT from login/signup)
+POST http://localhost:3000/seller/product
+Content-Type: application/json
+
+{
+
+    "productName": "Organic Apples",
+    "minThreshold": 5,
+    "maxCapacity": 100,
+    "category": "Fruits",
+    "origin": "Bulgaria",
+    "image": "https://example.com/apples.jpg",
+    "pricePerKg": 2.5,
+    "season": "Autumn"
+}
