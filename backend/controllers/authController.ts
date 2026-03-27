@@ -5,40 +5,57 @@ import {catch_async} from "../middleware/middleware"
 
 
 export const register = catch_async(async (req: Request, res: Response) => {
-    console.log("Registration request body:", JSON.stringify(req.body, null, 2));
-    const {email, password, name, role, city, phone} = req.body;
+    console.log("==> [REGISTER] Request Received:", JSON.stringify(req.body, null, 2));
+    const {email, password, name, role, city, mainCity, phone, phoneNumber} = req.body;
 
     if(!email || !password || !name || !role) {
-        const missing = [];
-        if(!email) missing.push('email');
-        if(!password) missing.push('password');
-        if(!name) missing.push('name');
-        if(!role) missing.push('role');
+        console.log("[REGISTER] Validation failed");
         return res.status(400).json({
-            message: `Missing fields: ${missing.join(', ')}. Received keys: ${Object.keys(req.body).join(', ')}`
+            message: "Missing required fields"
         });
     }
 
-    const userRecord = await admin.auth().createUser({
-        email,
-        password,
-        displayName: name,
-    }) 
+    try {
+        console.log("[REGISTER] Attempting to create Auth user:", email);
+        let userRecord;
+        try {
+            userRecord = await admin.auth().createUser({
+                email,
+                password,
+                displayName: name,
+            });
+            console.log("[REGISTER] Auth user created successfully:", userRecord.uid);
+        } catch (authError: any) {
+            if (authError.code === 'auth/email-already-exists') {
+                console.log("[REGISTER] User already exists in Auth, trying to get existing user");
+                userRecord = await admin.auth().getUserByEmail(email);
+            } else {
+                throw authError;
+            }
+        }
 
-    const uid = userRecord.uid;
+        const uid = userRecord.uid;
 
-    await db.collection('users').doc(uid).set({
-        name,
-        email,
-        password,
-        role,
-        city,
-        phone,
-        createdAt: new Date()
-    })
+        console.log("[REGISTER] Updating Firestore for UID:", uid);
+        await db.collection('users').doc(uid).set({
+            name,
+            email,
+            password, // NOTE: Not ideal to store plain text, but keeping as is for now
+            role,
+            city: city || mainCity || "",
+            phone: phone || phoneNumber || "",
+            createdAt: new Date()
+        });
 
-    return res.status(200).json({message: "User registered successfully"})
-
+        console.log("[REGISTER] Registration complete for:", email);
+        return res.status(200).json({status: "success", message: "User registered successfully"});
+    } catch (error: any) {
+        console.error("[REGISTER] ERROR:", error);
+        return res.status(500).json({
+            status: "error",
+            message: error.message || "An internal error occurred during registration"
+        });
+    }
 })
 
 export const getProfile = catch_async(async (req: Request, res: Response) => {

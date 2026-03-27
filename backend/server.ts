@@ -31,6 +31,6 @@ app.use("/buyer", buyerRoutes);
 app.use(error_lister);
 
 
-app.listen(PORT, () => {
-    console.log(`App is listening on ${PORT}`);
+app.listen(Number(PORT), "0.0.0.0", () => {
+    console.log(`App is listening on 0.0.0.0:${PORT}`);
 })
