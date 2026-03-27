@@ -20,6 +20,7 @@ class AppConstants {
 
   // ─── Български градове ───
   static const Map<String, ({double lat, double lng})> cityLocations = {
+    //TODO: Extract exact location of each city
     'Абланица': (lat: 0.0, lng: 0.0),
     'Абрит': (lat: 0.0, lng: 0.0),
     'Аврамово': (lat: 0.0, lng: 0.0),

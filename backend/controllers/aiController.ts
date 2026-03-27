@@ -12,6 +12,7 @@ export const classifyProduct = catch_async(async (req: Request, res: Response) =
     }
 
     try {
+        console.log("Sending request to AI service at:", `${AI_SERVICE_URL}/classify-product`);
         const response = await fetch(`${AI_SERVICE_URL}/classify-product`, {
             method: 'POST',
             headers: {
@@ -40,6 +41,7 @@ export const priceSuggestion = catch_async(async (req: Request, res: Response) =
     }
 
     try {
+        console.log("Sending request to AI service at:", `${AI_SERVICE_URL}/price-suggestion`);
         const response = await fetch(`${AI_SERVICE_URL}/price-suggestion`, {
             method: 'POST',
             headers: {
