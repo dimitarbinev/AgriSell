@@ -191,7 +191,7 @@ export const getSellerProfile = catch_async(async (req: Request, res: Response) 
                 sellerRating: sellerData.rating || 0.0,
                 productId: productDoc.id,
                 productName: productData.productName,
-                productCategory: productData.category,
+                productCategory: productData.category,  
                 productImageUrl: productData.image,
                 pricePerKg: productData.pricePerKg,
                 minThreshold: productData.minThreshold,
