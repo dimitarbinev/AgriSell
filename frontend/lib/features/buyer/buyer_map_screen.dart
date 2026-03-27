@@ -82,6 +82,7 @@ class _BuyerMapScreenState extends ConsumerState<BuyerMapScreen> {
   @override
   Widget build(BuildContext context) {
     final sellersAsync = ref.watch(mapSellersProvider);
+    final usersAsync = ref.watch(mapDirectoryUsersProvider);
     final listingsAsync = ref.watch(activeListingsProvider);
     final currentUserId = ref.watch(authStateProvider).value?.uid;
 
@@ -91,13 +92,26 @@ class _BuyerMapScreenState extends ConsumerState<BuyerMapScreen> {
     );
 
     final markers = sellersAsync.maybeWhen(
-      data: (sellers) => _markersFromFirestoreSellers(
-        sellers,
-        listings: listings,
-        currentUserId: currentUserId,
-        search: _searchQuery,
-        category: _selectedCategory,
-      ),
+      data: (sellers) {
+        return usersAsync.maybeWhen(
+          data: (dirUsers) => _buildCombinedMapMarkers(
+            sellers: sellers,
+            directoryUsers: dirUsers,
+            listings: listings,
+            currentUserId: currentUserId,
+            search: _searchQuery,
+            category: _selectedCategory,
+          ),
+          orElse: () => _buildCombinedMapMarkers(
+            sellers: sellers,
+            directoryUsers: const [],
+            listings: listings,
+            currentUserId: currentUserId,
+            search: _searchQuery,
+            category: _selectedCategory,
+          ),
+        );
+      },
       orElse: () => <_MapMarker>[],
     );
 
@@ -109,6 +123,8 @@ class _BuyerMapScreenState extends ConsumerState<BuyerMapScreen> {
     if (markers.isNotEmpty) {
       center = markers.first.position;
     }
+
+    final loading = sellersAsync.isLoading || usersAsync.isLoading;
 
     return NatureScaffold(
       safeArea: false,
@@ -127,14 +143,20 @@ class _BuyerMapScreenState extends ConsumerState<BuyerMapScreen> {
             markers: markers
                 .map(
                   (m) => Marker(
-                    markerId: MarkerId(m.sellerId),
+                    markerId: MarkerId(m.userId),
                     position: m.position,
-                    onTap: () => _showSellerSheet(context, m),
+                    onTap: () => _showPinSheet(context, m),
                     infoWindow: InfoWindow(
-                      title: m.sellerName,
-                      snippet: '${m.city} · ★ ${m.rating.toStringAsFixed(1)}',
+                      title: m.displayName,
+                      snippet: m.opensSellerProfile
+                          ? '${m.city} · ★ ${m.rating.toStringAsFixed(1)}'
+                          : '${m.city} · ${m.roleLabel}',
                     ),
-                    icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+                    icon: BitmapDescriptor.defaultMarkerWithHue(
+                      m.opensSellerProfile
+                          ? BitmapDescriptor.hueGreen
+                          : BitmapDescriptor.hueAzure,
+                    ),
                   ),
                 )
                 .toSet(),
@@ -142,7 +164,7 @@ class _BuyerMapScreenState extends ConsumerState<BuyerMapScreen> {
             zoomControlsEnabled: false,
           ),
 
-          if (sellersAsync.isLoading)
+          if (loading)
             const Positioned(
               left: 0,
               right: 0,
@@ -161,7 +183,7 @@ class _BuyerMapScreenState extends ConsumerState<BuyerMapScreen> {
                 controller: _searchController,
                 style: const TextStyle(color: Colors.white),
                 decoration: InputDecoration(
-                  hintText: 'Търси продавачи наблизо...',
+                  hintText: 'Търси хора наблизо...',
                   hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.4)),
                   prefixIcon: const Icon(Icons.search, size: 22, color: Colors.white70),
                   border: InputBorder.none,
@@ -205,7 +227,8 @@ class _BuyerMapScreenState extends ConsumerState<BuyerMapScreen> {
 
           if (markers.isEmpty &&
               sellersAsync.hasValue &&
-              !(sellersAsync.isLoading))
+              usersAsync.hasValue &&
+              !loading)
             Positioned(
               left: 20,
               right: 20,
@@ -216,10 +239,9 @@ class _BuyerMapScreenState extends ConsumerState<BuyerMapScreen> {
                 child: Padding(
                   padding: const EdgeInsets.all(12),
                   child: Text(
-                    (sellersAsync.value ?? []).isEmpty
-                        ? 'Все още няма продавачи в картата. Проверете колекцията sellers във Firebase.'
-                        : 'Няма продавачи по този филтър или градовете не са в списъка за карта. '
-                            'Добавете mainCity или разширейте resolveCityForMap в constants.',
+                    (sellersAsync.value ?? []).isEmpty && (usersAsync.value ?? []).isEmpty
+                        ? 'Няма записи в sellers / users с град, който картата разпознава.'
+                        : 'Няма резултати по филтъра или градът не е в списъка — вижте resolveCityForMap в constants.',
                     style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 13),
                   ),
                 ),
@@ -237,7 +259,25 @@ class _BuyerMapScreenState extends ConsumerState<BuyerMapScreen> {
                 child: Padding(
                   padding: const EdgeInsets.all(12),
                   child: Text(
-                    'Продавачите не се заредиха от Firebase: ${sellersAsync.error}',
+                    'sellers: ${sellersAsync.error}',
+                    style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 13),
+                  ),
+                ),
+              ),
+            ),
+
+          if (usersAsync.hasError)
+            Positioned(
+              left: 20,
+              right: 20,
+              bottom: usersAsync.hasError && sellersAsync.hasError ? 52 : 100,
+              child: Material(
+                color: AppTheme.cardSurface.withValues(alpha: 0.92),
+                borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Text(
+                    'users: ${usersAsync.error}',
                     style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 13),
                   ),
                 ),
@@ -248,7 +288,7 @@ class _BuyerMapScreenState extends ConsumerState<BuyerMapScreen> {
     );
   }
 
-  void _showSellerSheet(BuildContext context, _MapMarker marker) {
+  void _showPinSheet(BuildContext context, _MapMarker m) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -273,13 +313,15 @@ class _BuyerMapScreenState extends ConsumerState<BuyerMapScreen> {
             ),
             const SizedBox(height: 24),
             SellerCard(
-              name: marker.sellerName,
-              rating: marker.rating,
-              city: marker.city,
-              productChips: marker.products,
+              name: m.displayName,
+              rating: m.rating,
+              city: m.city,
+              productChips: m.products,
               onTap: () {
                 Navigator.pop(ctx);
-                context.push('/buyer/seller/${marker.sellerId}');
+                if (m.opensSellerProfile) {
+                  context.push('/buyer/seller/${m.userId}');
+                }
               },
             ),
             const SizedBox(height: 20),
@@ -297,9 +339,23 @@ class _BuyerMapScreenState extends ConsumerState<BuyerMapScreen> {
                 ),
                 onPressed: () {
                   Navigator.pop(ctx);
-                  context.push('/buyer/seller/${marker.sellerId}');
+                  if (m.opensSellerProfile) {
+                    context.push('/buyer/seller/${m.userId}');
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Публичен профил е наличен само за продавачите с обяви.'),
+                      ),
+                    );
+                  }
                 },
-                child: const Text('Към профила на продавача', style: TextStyle(fontWeight: FontWeight.bold)),
+                child: Text(
+                  m.opensSellerProfile
+                      ? 'Към профила на продавача'
+                      : 'Само продавачи имат магазин профил',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                  textAlign: TextAlign.center,
+                ),
               ),
             ),
             SizedBox(height: MediaQuery.of(ctx).padding.bottom + 10),
@@ -310,15 +366,14 @@ class _BuyerMapScreenState extends ConsumerState<BuyerMapScreen> {
   }
 }
 
-/// Pins from Firestore `sellers` (+ optional listing-based category filter & product chips).
-List<_MapMarker> _markersFromFirestoreSellers(
-  List<Seller> sellers, {
+List<_MapMarker> _buildCombinedMapMarkers({
+  required List<Seller> sellers,
+  required List<MapDirectoryUser> directoryUsers,
   required List<Listing> listings,
   String? currentUserId,
   required String search,
   String? category,
 }) {
-  /// When category is set and we have listing data: only these sellers. Empty set = no matches.
   Set<String>? sellerIdsForCategory;
   if (category != null && category.isNotEmpty) {
     if (listings.isEmpty) {
@@ -329,29 +384,6 @@ List<_MapMarker> _markersFromFirestoreSellers(
           .map((l) => l.sellerId)
           .toSet();
     }
-  }
-
-  final filtered = sellers.where((s) {
-    if (currentUserId != null && s.id == currentUserId) return false;
-    if (sellerIdsForCategory != null) {
-      if (sellerIdsForCategory.isEmpty) return false;
-      if (!sellerIdsForCategory.contains(s.id)) return false;
-    }
-    if (search.trim().isNotEmpty) {
-      final q = search.toLowerCase();
-      final cityResolved = AppConstants.resolveCityForMap(s.mainCity) ?? s.mainCity;
-      if (!s.name.toLowerCase().contains(q) && !cityResolved.toLowerCase().contains(q)) {
-        return false;
-      }
-    }
-    return true;
-  }).toList();
-
-  final cityGroups = <String, List<Seller>>{};
-  for (final s in filtered) {
-    final city = AppConstants.resolveCityForMap(s.mainCity);
-    if (city == null) continue;
-    cityGroups.putIfAbsent(city, () => []).add(s);
   }
 
   List<String> productChipsForSeller(String sellerId) {
@@ -365,16 +397,92 @@ List<_MapMarker> _markersFromFirestoreSellers(
     return names;
   }
 
-  final out = <_MapMarker>[];
-  for (final entry in cityGroups.entries) {
-    final city = entry.key;
-    final list = entry.value;
+  final raw = <_MapMarker>[];
+
+  final filteredSellers = sellers.where((s) {
+    if (currentUserId != null && s.id == currentUserId) return false;
+    if (sellerIdsForCategory != null) {
+      if (sellerIdsForCategory.isEmpty) return false;
+      if (!sellerIdsForCategory.contains(s.id)) return false;
+    }
+    if (search.trim().isNotEmpty) {
+      final q = search.toLowerCase();
+      final cityResolved = AppConstants.resolveCityForMap(s.mainCity) ?? s.mainCity;
+      if (!s.name.toLowerCase().contains(q) && !cityResolved.toLowerCase().contains(q)) {
+        return false;
+      }
+    }
+    return true;
+  });
+
+  for (final s in filteredSellers) {
+    final city = AppConstants.resolveCityForMap(s.mainCity);
+    if (city == null) continue;
     final coords = AppConstants.cityLocations[city];
     if (coords == null) continue;
+    raw.add(_MapMarker(
+      position: LatLng(coords.lat, coords.lng),
+      userId: s.id,
+      displayName: s.name.trim().isEmpty ? 'Продавач' : s.name.trim(),
+      city: city,
+      rating: s.rating,
+      products: productChipsForSeller(s.id),
+      opensSellerProfile: true,
+      roleLabel: 'Продавач',
+    ));
+  }
 
+  final onMapSellerIds = raw.map((m) => m.userId).toSet();
+
+  final categoryFiltersUsers = category != null && category.isNotEmpty;
+
+  for (final u in directoryUsers) {
+    if (currentUserId != null && u.id == currentUserId) continue;
+    if (onMapSellerIds.contains(u.id)) continue;
+    if (categoryFiltersUsers) continue;
+
+    if (search.trim().isNotEmpty) {
+      final q = search.toLowerCase();
+      if (!u.name.toLowerCase().contains(q) && !u.resolvedCity.toLowerCase().contains(q)) {
+        continue;
+      }
+    }
+
+    final coords = AppConstants.cityLocations[u.resolvedCity];
+    if (coords == null) continue;
+
+    final isSellerRole = u.role == 'seller';
+    final label = isSellerRole ? 'Продавач (профил)' : 'Купувач';
+
+    raw.add(_MapMarker(
+      position: LatLng(coords.lat, coords.lng),
+      userId: u.id,
+      displayName: u.name,
+      city: u.resolvedCity,
+      rating: 0,
+      products: [label],
+      opensSellerProfile: isSellerRole,
+      roleLabel: label,
+    ));
+  }
+
+  return _spreadPinsByCity(raw);
+}
+
+/// Offset pins that share the same city so they remain visible.
+List<_MapMarker> _spreadPinsByCity(List<_MapMarker> pins) {
+  final byCity = <String, List<_MapMarker>>{};
+  for (final p in pins) {
+    byCity.putIfAbsent(p.city, () => []).add(p);
+  }
+  final out = <_MapMarker>[];
+  for (final entry in byCity.entries) {
+    final city = entry.key;
+    final list = entry.value;
+    final coords = AppConstants.cityLocations[city]!;
     final base = LatLng(coords.lat, coords.lng);
     for (var i = 0; i < list.length; i++) {
-      final s = list[i];
+      final m = list[i];
       final pos = list.length <= 1
           ? base
           : LatLng(
@@ -383,11 +491,13 @@ List<_MapMarker> _markersFromFirestoreSellers(
             );
       out.add(_MapMarker(
         position: pos,
-        sellerId: s.id,
-        sellerName: s.name.trim().isEmpty ? 'Продавач' : s.name.trim(),
-        city: city,
-        rating: s.rating,
-        products: productChipsForSeller(s.id),
+        userId: m.userId,
+        displayName: m.displayName,
+        city: m.city,
+        rating: m.rating,
+        products: m.products,
+        opensSellerProfile: m.opensSellerProfile,
+        roleLabel: m.roleLabel,
       ));
     }
   }
@@ -396,17 +506,23 @@ List<_MapMarker> _markersFromFirestoreSellers(
 
 class _MapMarker {
   final LatLng position;
-  final String sellerId, sellerName, city;
+  final String userId;
+  final String displayName;
+  final String city;
   final double rating;
   final List<String> products;
+  final bool opensSellerProfile;
+  final String roleLabel;
 
   const _MapMarker({
     required this.position,
-    required this.sellerId,
-    required this.sellerName,
+    required this.userId,
+    required this.displayName,
     required this.city,
     required this.rating,
     required this.products,
+    required this.opensSellerProfile,
+    required this.roleLabel,
   });
 }
 

@@ -118,6 +118,47 @@ final mapSellersProvider = StreamProvider<List<Seller>>((ref) {
       );
 });
 
+/// Registered app users (`users/{uid}`) with a mappable city — fills pins when someone has no `sellers` doc yet.
+class MapDirectoryUser {
+  final String id;
+  final String name;
+  final String role;
+  final String resolvedCity;
+
+  const MapDirectoryUser({
+    required this.id,
+    required this.name,
+    required this.role,
+    required this.resolvedCity,
+  });
+}
+
+final mapDirectoryUsersProvider = StreamProvider<List<MapDirectoryUser>>((ref) {
+  return ref.watch(firestoreProvider).collection('users').snapshots().map((snap) {
+    final out = <MapDirectoryUser>[];
+    for (final d in snap.docs) {
+      final data = d.data();
+      final raw = (data['preferredCity'] as String?) ??
+          (data['mainCity'] as String?) ??
+          (data['city'] as String?) ??
+          '';
+      final city = AppConstants.resolveCityForMap(raw);
+      if (city == null) continue;
+      final name = (data['name'] as String?)?.trim();
+      final display = (name != null && name.isNotEmpty)
+          ? name
+          : (data['displayName'] as String?)?.trim() ?? 'Потребител';
+      out.add(MapDirectoryUser(
+        id: d.id,
+        name: display,
+        role: (data['role'] as String?) ?? '',
+        resolvedCity: city,
+      ));
+    }
+    return out;
+  });
+});
+
 // ─── All Active Listings (Backend Powered) ───
 final activeListingsProvider = FutureProvider<List<Listing>>((ref) {
   return ref.watch(productServiceProvider).getAvailableListings();
