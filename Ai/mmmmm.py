@@ -123,12 +123,12 @@ class City(BaseModel):
     lng: float
     requested_qty: float
 
-class DbRouteRequest(BaseModel):
+class ListingRouteRequest(BaseModel):
     seller_id: str
     listing_id: str
-    product_id: str
-    cost_per_hour: float = 15.0
-    start_location_name: str = "Склад на продавача"
+    # product_id: str
+    # cost_per_hour: float = 15.0
+    # start_location_name: str = "Склад на продавача"
 
 class TelegramMessageRequest(BaseModel):
     phone_number: str
@@ -170,12 +170,44 @@ async def get_coordinates(city_name: str):
         print(f"Error geocoding {city_name}: {e}")
     return None
 
+async def _fetch_api_route(subset_cities, label, seller_coords, seller_city_name):
+    if not subset_cities: return None
+    dest = subset_cities[-1]
+    wps = subset_cities[:-1]
+    origin = f"{seller_coords['lat']},{seller_coords['lng']}"
+    destination = f"{dest.lat},{dest.lng}"
+    wp_param = f"&waypoints=optimize:true|{'|'.join(f'{c.lat},{c.lng}' for c in wps)}" if wps else ""
+    
+    url = f"https://maps.googleapis.com/maps/api/directions/json?origin={origin}&destination={destination}{wp_param}&key={MAPS_KEY}"
+    async with httpx.AsyncClient() as client:
+        r = await client.get(url)
+        data = r.json()
+        if data.get("status") == "OK":
+            route = data["routes"][0]
+            total_hrs = sum(l["duration"]["value"] for l in route["legs"]) / 3600
+            total_km = sum(l["distance"]["value"] for l in route["legs"]) / 1000
+            
+            order = route.get("waypoint_order", [])
+            stops = [seller_city_name]
+            for idx in order:
+                stops.append(wps[idx].name)
+            stops.append(dest.name)
+            
+            return {
+                "label": label,
+                "ordered_stops": stops,
+                "travel_time_readable": format_time(total_hrs),
+                "total_travel_hours": round(total_hrs, 2),
+                "total_distance_km": round(total_km, 2)
+            }
+        return None
+
 # -------------------------------------------------------
 # Endpoint
 # -------------------------------------------------------
 
-@app.post("/recommend-route")
-async def recommend_route(req: DbRouteRequest):
+@app.post("/listing/route")
+async def recommend_route(req: ListingRouteRequest):
     if not firebase_available or db is None:
         raise HTTPException(status_code=503, detail="Firebase not available")
 
@@ -192,16 +224,7 @@ async def recommend_route(req: DbRouteRequest):
         if not seller_coords:
             raise HTTPException(status_code=400, detail=f"Coordinates for city '{seller_city_name}' not found")
 
-        # 2. Fetch Product/Listing Info
-        product_doc = db.collection("users").document(req.seller_id).collection("products").document(req.product_id).get()
-        if not product_doc.exists:
-            raise HTTPException(status_code=404, detail="Product not found")
-        
-        product_data = product_doc.to_dict()
-        price_per_kg = float(product_data.get("pricePerKg", 0))
-        available_qty = float(product_data.get("maxCapacity", 0))
-
-        # 3. Fetch Reservations for this listing
+        # 2. Fetch Reservations for this listing (Product info removed as per request)
         reservations_query = db.collection("reservations").where("listingId", "==", req.listing_id).stream()
         
         city_demands = {} # buyer_id -> city & qty
@@ -242,49 +265,11 @@ async def recommend_route(req: DbRouteRequest):
         if not candidates:
             return {"options": [], "message": "Няма активни поръчки с достатъчно количество."}
 
-        # --- Sub-algorithm for routes ---
-        async def fetch_api_route(subset_cities, label):
-            if not subset_cities: return None
-            dest = subset_cities[-1]
-            wps = subset_cities[:-1]
-            origin = f"{seller_coords['lat']},{seller_coords['lng']}"
-            destination = f"{dest.lat},{dest.lng}"
-            wp_param = f"&waypoints=optimize:true|{'|'.join(f'{c.lat},{c.lng}' for c in wps)}" if wps else ""
-            
-            url = f"https://maps.googleapis.com/maps/api/directions/json?origin={origin}&destination={destination}{wp_param}&key={MAPS_KEY}"
-            async with httpx.AsyncClient() as client:
-                r = await client.get(url)
-                data = r.json()
-                if data.get("status") == "OK":
-                    route = data["routes"][0]
-                    total_hrs = sum(l["duration"]["value"] for l in route["legs"]) / 3600
-                    total_km = sum(l["distance"]["value"] for l in route["legs"]) / 1000
-                    
-                    order = route.get("waypoint_order", [])
-                    stops = [seller_city_name]
-                    for idx in order:
-                        stops.append(wps[idx].name)
-                    stops.append(dest.name)
-                    
-                    sell_qty = min(sum(c.requested_qty for c in subset_cities), available_qty)
-                    profit = (sell_qty * price_per_kg) - (total_hrs * req.cost_per_hour)
-                    
-                    return {
-                        "label": label,
-                        "ordered_stops": stops,
-                        "travel_time_readable": format_time(total_hrs),
-                        "total_travel_hours": round(total_hrs, 2),
-                        "total_distance_km": round(total_km, 2),
-                        "estimated_profit_bgn": round(profit, 2),
-                        "is_profitable": profit > 0
-                    }
-                return None
-
-        # 6. Generate Scenarios (Full Path and Local Path only)
-        task_full = fetch_api_route(candidates, "Пълна обиколка")
+        # 3. Generate Scenarios (Full Path and Local Path only)
+        task_full = _fetch_api_route(candidates, "Пълна обиколка", seller_coords, seller_city_name)
         
         local_cities = [c for c in candidates if get_distance_km(seller_coords['lat'], seller_coords['lng'], c.lat, c.lng) < 45]
-        task_local = fetch_api_route(local_cities, "Локален лъч")
+        task_local = _fetch_api_route(local_cities, "Локален лъч", seller_coords, seller_city_name)
 
         results = await asyncio.gather(task_full, task_local)
         

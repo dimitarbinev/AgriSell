@@ -4,7 +4,10 @@ from firebase_admin import credentials, firestore
 import httpx
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from typing import List, Literal, Optional
+from pydantic import BaseModel, Field
+from langchain_openai import ChatOpenAI
+from langchain_core.prompts import ChatPromptTemplate
 import os
 import asyncio
 from math import radians, cos, sin, asin, sqrt
@@ -102,6 +105,16 @@ class CityModel(BaseModel):
     lng: float
     requested_qty: float
 
+class ProduceClassification(BaseModel):
+    item: str = Field(description="Името на продукта на български")
+    category: Literal["зеленчук", "плод", "месо", "млечен продукт", "друго"] = Field(
+        description="Категорията, към която принадлежи продукта"
+    )
+    confidence: float = Field(description="Увереност на модела от 0 до 1")
+
+class ClassificationRequest(BaseModel):
+    product_name: str
+
 class DbRouteRequest(BaseModel):
     seller_id: str
     listing_id: str
@@ -152,9 +165,39 @@ async def get_coordinates(city_name: str):
     
     return None
 
+# --- Classification Setup ---
+llm = None
+classification_chain = None
+
+if os.getenv("OPENAI_API_KEY"):
+    try:
+        llm = ChatOpenAI(model="gpt-4o-mini", temperature=0).with_structured_output(ProduceClassification)
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", "Ти си експерт по хранителни стоки. Твоята задача е да класифицираш продукти на български език в правилни категории."),
+            ("human", "Класифицирай следния продукт: {product}")
+        ])
+        classification_chain = prompt | llm
+    except Exception as e:
+        print(f"Error initializing OpenAI: {e}")
+
 # -------------------------------------------------------
 # Endpoints
 # -------------------------------------------------------
+
+@app.post("/classify-product")
+async def classify_product(req: ClassificationRequest):
+    if not classification_chain:
+        # Fallback logic if OpenAI is not configured
+        name = req.product_name.lower()
+        if "домат" in name or "краставиц" in name:
+            return {"item": req.product_name, "category": "зеленчук", "confidence": 1.0}
+        return {"item": req.product_name, "category": "друго", "confidence": 0.0}
+    
+    try:
+        result = classification_chain.invoke({"product": req.product_name})
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Classification error: {str(e)}")
 
 @app.post("/predict-price")
 async def predict_price(req: PriceRequest):
