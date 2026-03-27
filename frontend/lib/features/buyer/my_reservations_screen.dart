@@ -1,14 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../core/theme.dart';
 import '../../shared/models/models.dart';
 import '../../shared/widgets/status_chip.dart';
+import '../../shared/providers/providers.dart';
 
-class MyReservationsScreen extends StatelessWidget {
+class MyReservationsScreen extends ConsumerWidget {
   const MyReservationsScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final reservationsAsync = ref.watch(backendBuyerReservationsProvider);
+
     return Scaffold(
       body: SafeArea(
         child: Column(
@@ -20,56 +24,70 @@ class MyReservationsScreen extends StatelessWidget {
                   style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: AppTheme.textPrimary)),
             ),
             Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                itemCount: _reservations.length,
-                itemBuilder: (ctx, i) {
-                  final r = _reservations[i];
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    padding: const EdgeInsets.all(16),
-                    decoration: glassDecoration(),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
+              child: reservationsAsync.when(
+                data: (reservations) {
+                  if (reservations.isEmpty) {
+                    return const Center(
+                      child: Text('You have no reservations yet.',
+                          style: TextStyle(color: AppTheme.textSecondary)),
+                    );
+                  }
+                  return ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    itemCount: reservations.length,
+                    itemBuilder: (ctx, i) {
+                      final r = reservations[i];
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        padding: const EdgeInsets.all(16),
+                        decoration: glassDecoration(),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Container(
-                              width: 44, height: 44,
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
-                                color: AppTheme.cardSurfaceLight,
-                              ),
-                              child: const Icon(Icons.eco, color: AppTheme.accentGreen, size: 24),
+                            Row(
+                              children: [
+                                Container(
+                                  width: 44, height: 44,
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
+                                    color: AppTheme.cardSurfaceLight,
+                                  ),
+                                  child: const Icon(Icons.eco, color: AppTheme.accentGreen, size: 24),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(r.productName?.isNotEmpty == true ? r.productName! : 'Product',
+                                          style: const TextStyle(fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
+                                      Text('${r.city ?? 'Local'} · ${DateFormat('MMM d').format(r.attendanceDate)}',
+                                          style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
+                                    ],
+                                  ),
+                                ),
+                                StatusChip(status: r.status, small: true),
+                              ],
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(r.productName ?? 'Product',
-                                      style: const TextStyle(fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
-                                  Text('${r.city ?? ''} · ${DateFormat('MMM d').format(r.attendanceDate)}',
-                                      style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
-                                ],
-                              ),
+                            const SizedBox(height: 12),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                _DetailItem(label: 'Quantity', value: '${r.quantity.toStringAsFixed(0)} kg'),
+                                _DetailItem(label: 'Deposit', value: '${r.deposit.toStringAsFixed(2)} лв'),
+                                _DetailItem(label: 'Price', value: '${(r.pricePerKg ?? 0).toStringAsFixed(2)} лв/kg'),
+                              ],
                             ),
-                            StatusChip(status: r.status, small: true),
                           ],
                         ),
-                        const SizedBox(height: 12),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            _DetailItem(label: 'Quantity', value: '${r.quantity.toStringAsFixed(0)} kg'),
-                            _DetailItem(label: 'Deposit', value: '${r.deposit.toStringAsFixed(2)} лв'),
-                            _DetailItem(label: 'Price', value: '${(r.pricePerKg ?? 0).toStringAsFixed(2)} лв/kg'),
-                          ],
-                        ),
-                      ],
-                    ),
+                      );
+                    },
                   );
                 },
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (err, stack) => Center(
+                  child: Text('Error: $err', style: const TextStyle(color: Colors.red)),
+                ),
               ),
             ),
           ],
@@ -94,12 +112,3 @@ class _DetailItem extends StatelessWidget {
     );
   }
 }
-
-final _reservations = [
-  Reservation(id: 'r1', buyerId: 'b1', listingId: '1', quantity: 10, deposit: 35, attendanceDate: DateTime.now().add(const Duration(days: 2)),
-    status: 'confirmed', productName: 'Fresh Tomatoes', city: 'Sofia', pricePerKg: 3.50),
-  Reservation(id: 'r2', buyerId: 'b1', listingId: '2', quantity: 5, deposit: 14, attendanceDate: DateTime.now().add(const Duration(days: 3)),
-    status: 'pending', productName: 'Organic Apples', city: 'Plovdiv', pricePerKg: 2.80),
-  Reservation(id: 'r3', buyerId: 'b1', listingId: '4', quantity: 8, deposit: 17.60, attendanceDate: DateTime.now().subtract(const Duration(days: 5)),
-    status: 'completed', productName: 'Fresh Carrots', city: 'Burgas', pricePerKg: 2.20),
-];

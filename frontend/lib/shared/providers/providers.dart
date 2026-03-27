@@ -192,6 +192,11 @@ final buyerReservationsProvider =
           );
     });
 
+// ─── Buyer's Reservations (Backend) ───
+final backendBuyerReservationsProvider = FutureProvider<List<Reservation>>((ref) {
+  return ref.watch(productServiceProvider).getMyReservations();
+});
+
 // ─── Seller Reviews ───
 final sellerReviewsProvider = StreamProvider.family<List<Review>, String>((
   ref,

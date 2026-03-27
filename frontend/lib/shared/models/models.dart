@@ -335,8 +335,9 @@ class Reservation {
       listingId: json['listingId'] as String? ?? '',
       quantity: (json['quantity'] as num?)?.toDouble() ?? 0.0,
       deposit: (json['deposit'] as num?)?.toDouble() ?? 0.0,
-      attendanceDate:
-          (json['attendanceDate'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      attendanceDate: json['attendanceDate'] is String
+          ? DateTime.parse(json['attendanceDate'] as String)
+          : (json['attendanceDate'] as Timestamp?)?.toDate() ?? DateTime.now(),
       status: json['status'] as String? ?? 'pending',
       buyerName: json['buyerName'] as String?,
       productName: json['productName'] as String?,

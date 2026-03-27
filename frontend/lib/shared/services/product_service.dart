@@ -288,4 +288,29 @@ class ProductService {
         .snapshots()
         .map((snap) => snap.docs.map((doc) => doc.id).toList());
   }
+
+  Future<List<Reservation>> getMyReservations() async {
+    final user = _auth.currentUser;
+    if (user == null) throw Exception('No authenticated user found');
+
+    final idToken = await user.getIdToken();
+    if (idToken == null) throw Exception('Failed to retrieve authentication token');
+
+    final cleanBaseUrl = _baseUrl.endsWith('/') ? _baseUrl.substring(0, _baseUrl.length - 1) : _baseUrl;
+    final url = Uri.parse('$cleanBaseUrl/buyer/my_reservations');
+
+    final response = await http.get(
+      url,
+      headers: {
+        'Authorization': 'Bearer $idToken',
+      },
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to load reservations: ${response.body}');
+    }
+
+    final List<dynamic> data = jsonDecode(response.body);
+    return data.map((item) => Reservation.fromJson(item, item['id'] ?? '')).toList();
+  }
 }
