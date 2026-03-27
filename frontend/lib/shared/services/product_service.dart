@@ -67,6 +67,43 @@ class ProductService {
     }
   }
 
+  /// Calls the AI /price-suggestion endpoint.
+  /// Returns a map with keys: product, quarterly_prices, overall_average,
+  /// season_average, suggested_price, season, unit.
+  /// Returns null if the product is not in the NSI Excel data.
+  Future<Map<String, dynamic>?> getPriceSuggestion(
+    String productName, {
+    String? season,
+  }) async {
+    final user = _auth.currentUser;
+    if (user == null) return null;
+    final idToken = await user.getIdToken();
+    if (idToken == null) return null;
+
+    try {
+      final cleanBaseUrl =
+          _baseUrl.endsWith('/') ? _baseUrl.substring(0, _baseUrl.length - 1) : _baseUrl;
+      final url = Uri.parse('$cleanBaseUrl/price-suggestion');
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $idToken',
+        },
+        body: jsonEncode({
+          'product_name': productName,
+          if (season != null) 'season': season,
+        }),
+      );
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body) as Map<String, dynamic>;
+      }
+    } catch (e) {
+      print('Price suggestion error: $e');
+    }
+    return null;
+  }
+
   Future<String?> classifyProduct(String productName) async {
     final user = _auth.currentUser;
     if (user == null) return null;
@@ -76,7 +113,7 @@ class ProductService {
 
     try {
       final cleanBaseUrl = _baseUrl.endsWith('/') ? _baseUrl.substring(0, _baseUrl.length - 1) : _baseUrl;
-      final url = Uri.parse('$cleanBaseUrl/ai/classify');
+      final url = Uri.parse('$cleanBaseUrl/classify-product');
 
       final response = await http.post(
         url,
@@ -84,7 +121,7 @@ class ProductService {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $idToken',
         },
-        body: jsonEncode({'productName': productName}),
+        body: jsonEncode({'product_name': productName}),
       );
 
       if (response.statusCode == 200) {

@@ -4,7 +4,7 @@ from firebase_admin import credentials, firestore
 import httpx
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from typing import List, Literal, Optional
+from typing import Dict, List, Literal, Optional
 from pydantic import BaseModel, Field
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
@@ -12,6 +12,7 @@ import os
 import asyncio
 from math import radians, cos, sin, asin, sqrt
 from dotenv import load_dotenv
+import pandas as pd
 
 load_dotenv()
 
@@ -115,11 +116,145 @@ class ProduceClassification(BaseModel):
 class ClassificationRequest(BaseModel):
     product_name: str
 
+class PriceSuggestionRequest(BaseModel):
+    product_name: str
+    season: Optional[str] = None  # 'Пролет', 'Лято', 'Есен', 'Зима', 'Целогодишно'
+
 class DbRouteRequest(BaseModel):
     seller_id: str
     listing_id: str
     product_id: str
     cost_per_hour: float = 15.0
+
+# -------------------------------------------------------
+# Excel — NSI Agricultural Price Data
+# -------------------------------------------------------
+
+EXCEL_PATH = os.path.join(
+    os.path.dirname(__file__),
+    "Prices_of_agricultural_products_by_year.xlsx"
+)
+
+# Season → quarter column in Excel
+SEASON_TO_QUARTER: Dict[str, Optional[str]] = {
+    "Пролет": "Q2",         # April–June
+    "Лято":   "Q3",         # July–September
+    "Есен":   "Q4",         # October–December
+    "Зима":   "Q1",         # January–March
+    "Целогодишно": None,    # use overall average
+}
+
+# Cached dataframe & product list
+_excel_df: Optional[pd.DataFrame] = None
+_excel_products: Optional[List[str]] = None
+
+def _get_excel_data() -> tuple[Optional[pd.DataFrame], Optional[List[str]]]:
+    """Load & cache the Excel. Returns (df, product_names)."""
+    global _excel_df, _excel_products
+    if _excel_df is not None:
+        return _excel_df, _excel_products
+    if not os.path.exists(EXCEL_PATH):
+        return None, None
+    try:
+        # Row 0 = title, Row 1 = merged header, Row 2 = quarter labels → skip 3 rows
+        df = pd.read_excel(EXCEL_PATH, header=None, skiprows=3)
+        # Actual columns after skipping:
+        # 0=Код  1=Показател  2=Мерна ед.  3=Q1  4=Q2  5=Q3  6=Q4  7=Annual
+        df.columns = ["code", "name", "unit", "Q1", "Q2", "Q3", "Q4", "annual"]
+        df = df.dropna(subset=["name"])
+        df = df[df["name"].astype(str).str.strip() != ""]
+        df = df.reset_index(drop=True)
+        _excel_df = df
+        _excel_products = df["name"].tolist()
+        return _excel_df, _excel_products
+    except Exception as e:
+        print(f"Excel load error: {e}")
+        return None, None
+
+def _norm(s: str) -> str:
+    return str(s).lower().strip()
+
+def _find_product_simple(products: List[str], needle: str) -> Optional[int]:
+    """
+    Substring match — returns the index of the row with the most quarterly data.
+    Prefers rows with more non-missing Q1-Q4 values over the first match.
+    """
+    n = _norm(needle)
+    matches = []
+    for i, p in enumerate(products):
+        if n in _norm(p):
+            matches.append(i)
+
+    if not matches:
+        return None
+    if len(matches) == 1:
+        return matches[0]
+
+    # Multiple matches — prefer the one with the most quarterly data
+    df, _ = _get_excel_data()
+    if df is None:
+        return matches[0]
+
+    best_idx = matches[0]
+    best_count = 0
+    for i in matches:
+        row = df.iloc[i]
+        count = sum(
+            1 for q in ["Q1", "Q2", "Q3", "Q4"]
+            if str(row[q]) not in ("-", "nan", "") and row[q] is not None
+        )
+        if count > best_count:
+            best_count = count
+            best_idx = i
+
+    return best_idx
+
+async def _find_product_openai(products: List[str], needle: str) -> Optional[int]:
+    """Ask GPT-4o-mini to pick the best matching product index."""
+    if not os.getenv("OPENAI_API_KEY"):
+        return None
+    try:
+        numbered = "\n".join(f"{i}. {p}" for i, p in enumerate(products))
+        from langchain_openai import ChatOpenAI as _LLM
+        _llm = _LLM(model="gpt-4o-mini", temperature=0)
+        prompt = (
+            f"Имаш списък от официални статистически показатели на селскостопански продукти (на български).\n"
+            f"Намери индекса на показателя, който НАЙ-ДОБРЕ съответства на: \"{needle}\"\n"
+            f"(Забележка: Входът може да е на латиница/транслитерация или синоним).\n\n"
+            f"{numbered}\n\n"
+            "Отговори САМО с числото (индекса). Ако няма подходящ отговори с -1."
+        )
+        result = await _llm.ainvoke(prompt)
+        idx = int(result.content.strip())
+        if 0 <= idx < len(products):
+            return idx
+    except Exception as e:
+        print(f"OpenAI matching error: {e}")
+    return None
+
+EUR_TO_BGN = 1.95583  # Фиксиран курс БНБ
+
+def _to_per_kg(value, unit: str) -> Optional[float]:
+    """Convert raw Excel value to €/кг based on unit."""
+    try:
+        v = float(value)
+        if v <= 0:
+            return None
+    except (ValueError, TypeError):
+        return None
+    u = str(unit).strip().lower()
+    if u == "т":
+        return round(v / 1000, 4)   # €/тон → €/кг
+    elif u in ("кг", "kg"):
+        return round(v, 4)           # already per кг
+    elif u == "хил.л":
+        return round(v / 1000, 4)   # €/хил.л → €/л
+    else:
+        return round(v, 4)           # бр, etc. — return raw
+
+def _eur_bgn(eur: float) -> float:
+    """Convert € to лв."""
+    return round(eur * EUR_TO_BGN, 2)
 
 # -------------------------------------------------------
 # Helpers
@@ -171,9 +306,10 @@ classification_chain = None
 
 if os.getenv("OPENAI_API_KEY"):
     try:
+        custom_instructions = ["Доматът е зеленчук."]
         llm = ChatOpenAI(model="gpt-4o-mini", temperature=0).with_structured_output(ProduceClassification)
         prompt = ChatPromptTemplate.from_messages([
-            ("system", "Ти си експерт по хранителни стоки. Твоята задача е да класифицираш продукти на български език в правилни категории."),
+            ("system", f"Ти си експерт по хранителни стоки. Твоята задача е да класифицираш продукти на български език в правилни категории. Следвай следните инструкции: {",".join(custom_instructions)}"),
             ("human", "Класифицирай следния продукт: {product}")
         ])
         classification_chain = prompt | llm
@@ -183,6 +319,103 @@ if os.getenv("OPENAI_API_KEY"):
 # -------------------------------------------------------
 # Endpoints
 # -------------------------------------------------------
+
+@app.post("/price-suggestion")
+async def price_suggestion(req: PriceSuggestionRequest):
+    """
+    Търси продукта в NSI Excel файла и връща препоръчана цена на кг.
+    Input:  { product_name: 'Домати', season: 'Лято' }
+    Output: { product, quarterly_prices, overall_average, season_average, suggested_price }
+    """
+    df, products = _get_excel_data()
+    if df is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Excel файлът с цени не е намерен на сървъра."
+        )
+
+    # 1. Simple substring match first (fast & free)
+    idx = _find_product_simple(products, req.product_name)
+
+    # 2. OpenAI fallback for Bulgarian morphology / synonyms
+    if idx is None:
+        idx = await _find_product_openai(products, req.product_name)
+
+    if idx is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Продуктът '{req.product_name}' не е намерен в базата с цени."
+        )
+
+    row  = df.iloc[idx]
+    unit = str(row["unit"])
+
+    # 3. Build quarterly prices in €/кг
+    quarterly_eur: Dict[str, float] = {}
+    for q in ["Q1", "Q2", "Q3", "Q4"]:
+        raw = row[q]
+        if str(raw) not in ("-", "nan", "") and raw is not None:
+            pkg = _to_per_kg(raw, unit)
+            if pkg is not None:
+                quarterly_eur[q] = pkg
+
+    if not quarterly_eur:
+        raise HTTPException(
+            status_code=422,
+            detail="Не можахме да извлечем тримесечни цени за намерения продукт."
+        )
+
+    # Convert all quarters to BGN
+    quarterly_bgn = {q: _eur_bgn(v) for q, v in quarterly_eur.items()}
+
+    vals_eur = list(quarterly_eur.values())
+    
+    # 4. Overall / Annual Average
+    # We prefer the pre-calculated 'annual' column from Excel if available
+    raw_annual = row.get("annual")
+    annual_pkg = _to_per_kg(raw_annual, unit) if raw_annual is not None else None
+    
+    if annual_pkg is not None:
+        overall_avg_eur = annual_pkg
+    else:
+        # Fallback to simple mean if annual col is empty
+        overall_avg_eur = round(sum(vals_eur) / len(vals_eur), 4)
+        
+    overall_avg_bgn = _eur_bgn(overall_avg_eur)
+
+    # 4. Season-specific price
+    season_eur: Optional[float] = None
+    season_bgn: Optional[float] = None
+    if req.season:
+        quarter = SEASON_TO_QUARTER.get(req.season)
+        if quarter:
+            season_eur = quarterly_eur.get(quarter)
+            season_bgn = quarterly_bgn.get(quarter)
+        else:                    # Целогодишно → overall avg
+            season_eur = overall_avg_eur
+            season_bgn = overall_avg_bgn
+
+    suggested_eur = season_eur if season_eur is not None else overall_avg_eur
+    suggested_bgn = season_bgn if season_bgn is not None else overall_avg_bgn
+
+    return {
+        "product":              row["name"],
+        "unit":                 unit,
+        # Тримесечни цени
+        "quarterly_eur":        quarterly_eur,   # €/кг
+        "quarterly_bgn":        quarterly_bgn,   # лв/кг
+        # Годишна средна
+        "overall_average_eur":  overall_avg_eur,
+        "overall_average_bgn":  overall_avg_bgn,
+        # Сезонна средна (None ако няма избран сезон)
+        "season_average_eur":   season_eur,
+        "season_average_bgn":   season_bgn,
+        # Препоръчана цена (сезонна ако е избран сезон, иначе годишна)
+        "suggested_price_eur":  round(suggested_eur, 2),
+        "suggested_price_bgn":  round(suggested_bgn, 2),
+        "season":               req.season,
+    }
+
 
 @app.post("/classify-product")
 async def classify_product(req: ClassificationRequest):

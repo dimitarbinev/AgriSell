@@ -27,6 +27,14 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
   String? _selectedSeason;
   File? _imageFile;
 
+  // Price suggestion state
+  double? _overallAvgPrice;      // annual average BGN
+  double? _overallAvgPriceEur;   // annual average EUR
+  double? _suggestedPrice;       // suggested BGN
+  double? _suggestedPriceEur;    // suggested EUR
+  bool _userEditedPrice = false;
+  bool _isFetchingPrice = false;
+
   bool _isLoading = false;
   Timer? _debounce;
 
@@ -42,16 +50,44 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
     super.dispose();
   }
 
+  // ─── Fetch price suggestion from the AI / Excel backend ───
+  Future<void> _fetchPriceSuggestion(String name, {String? season}) async {
+    if (name.length < 3) return;
+    setState(() => _isFetchingPrice = true);
+    final data = await ref
+        .read(productServiceProvider)
+        .getPriceSuggestion(name, season: season);
+    if (!mounted) return;
+    setState(() {
+      _isFetchingPrice = false;
+      if (data != null) {
+        _overallAvgPrice    = (data['overall_average_bgn'] as num?)?.toDouble();
+        _overallAvgPriceEur = (data['overall_average_eur'] as num?)?.toDouble();
+        _suggestedPrice     = (data['suggested_price_bgn'] as num?)?.toDouble();
+        _suggestedPriceEur  = (data['suggested_price_eur'] as num?)?.toDouble();
+        if (!_userEditedPrice && _suggestedPrice != null) {
+          _priceController.text = _suggestedPrice!.toStringAsFixed(2);
+        }
+      } else {
+        _overallAvgPrice    = null;
+        _overallAvgPriceEur = null;
+        _suggestedPrice     = null;
+        _suggestedPriceEur  = null;
+      }
+    });
+  }
+
   void _onNameChanged(String value) {
     if (_debounce?.isActive ?? false) _debounce!.cancel();
     _debounce = Timer(const Duration(milliseconds: 800), () async {
       if (value.length > 2) {
+        // Classify category
         final category = await ref.read(productServiceProvider).classifyProduct(value);
         if (category != null && mounted) {
-          setState(() {
-            _selectedCategory = category;
-          });
+          setState(() => _selectedCategory = category);
         }
+        // Fetch price suggestion (pass current season if already chosen)
+        await _fetchPriceSuggestion(value, season: _selectedSeason);
       }
     });
   }
@@ -229,10 +265,69 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
                 controller: _priceController,
                 keyboardType: TextInputType.number,
                 style: const TextStyle(color: Colors.white),
-                decoration: _inputDecoration('0.00').copyWith(
+                onChanged: (_) => setState(() => _userEditedPrice = true),
+                decoration: _inputDecoration(
+                  _isFetchingPrice
+                      ? 'Зарежда препоръчана цена...'
+                      : _suggestedPrice != null
+                          ? 'Препоръчана: ${_suggestedPrice!.toStringAsFixed(2)} лв/кг'
+                          : '0.00',
+                ).copyWith(
                   prefixIcon: const Icon(Icons.payments_outlined, color: AppTheme.accentGreen, size: 20),
+                  suffixIcon: _isFetchingPrice
+                      ? const Padding(
+                          padding: EdgeInsets.all(12),
+                          child: SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.accentGreen),
+                          ),
+                        )
+                      : null,
                 ),
               ),
+              // EUR price chip shown when we have a suggestion
+              if (!_isFetchingPrice && _suggestedPrice != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6, left: 4),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.euro_rounded, size: 13, color: AppTheme.accentGreen),
+                      const SizedBox(width: 4),
+                      Text(
+                        _suggestedPriceEur != null
+                            ? '${_suggestedPrice!.toStringAsFixed(2)} лв/кг  ·  ${_suggestedPriceEur!.toStringAsFixed(2)} €/кг'
+                            : '${_suggestedPrice!.toStringAsFixed(2)} лв/кг',
+                        style: TextStyle(
+                          color: AppTheme.accentGreen.withValues(alpha: 0.9),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              // "Средната пазарна цена е X" when user edits the field
+              if (_userEditedPrice && _overallAvgPrice != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4, left: 4),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.info_outline_rounded, size: 14, color: AppTheme.accentGreen),
+                      const SizedBox(width: 6),
+                      Text(
+                        _overallAvgPriceEur != null
+                            ? 'Средната пазарна цена е ${_overallAvgPrice!.toStringAsFixed(2)} лв/кг  ·  ${_overallAvgPriceEur!.toStringAsFixed(2)} €/кг'
+                            : 'Средната пазарна цена е ${_overallAvgPrice!.toStringAsFixed(2)} лв/кг',
+                        style: TextStyle(
+                          color: AppTheme.accentGreen.withValues(alpha: 0.75),
+                          fontSize: 12,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               const SizedBox(height: 18),
 
               Row(
@@ -300,7 +395,17 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
                           items: AppConstants.seasons
                               .map((s) => DropdownMenuItem(value: s, child: Text(s, style: const TextStyle(color: Colors.white))))
                               .toList(),
-                          onChanged: (v) => setState(() => _selectedSeason = v),
+                          onChanged: (v) {
+                            setState(() {
+                              _selectedSeason = v;
+                              // Reset user-edit flag so prefill can update
+                              _userEditedPrice = false;
+                            });
+                            // Re-fetch price for the selected season
+                            if (_nameController.text.length > 2) {
+                              _fetchPriceSuggestion(_nameController.text, season: v);
+                            }
+                          },
                         ),
                       ],
                     ),
