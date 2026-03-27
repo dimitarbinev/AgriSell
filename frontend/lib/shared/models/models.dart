@@ -338,7 +338,9 @@ class Reservation {
       status: rawStatus == 'pending' ? 'active' : (rawStatus ?? 'active'),
       buyerName: json['buyerName'] as String?,
       productName: json['productName'] as String?,
-      city: json['city'] as String?,
+      city: json['city'] as String? ??
+          json['deliveryCity'] as String? ??
+          json['buyerCity'] as String?,
       pricePerKg: (json['pricePerKg'] as num?)?.toDouble(),
       sellerId: json['sellerId'] as String?,
       createdAt: _parseDateTime(json['createdAt']),

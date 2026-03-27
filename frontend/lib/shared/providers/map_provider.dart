@@ -6,6 +6,7 @@ import 'dart:math';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../../core/constants.dart';
+import '../models/route_stop.dart';
 
 class MapState {
   final Set<Marker> markers;
@@ -55,6 +56,238 @@ class MapNotifier extends Notifier<MapState> {
   @override
   MapState build() => MapState();
 
+  /// Clears map overlays when there is nothing to route (e.g. fewer than 2 stops).
+  void clearRoute() {
+    state = MapState();
+  }
+
+  LatLng _markerPositionForStop(
+      SellerRouteStop stop, List<SellerRouteStop> segment, int index) {
+    final base = AppConstants.cityLocations[stop.city]!;
+    final baseLatLng = LatLng(base.lat, base.lng);
+    final sameIdx = <int>[];
+    for (var j = 0; j < segment.length; j++) {
+      if (segment[j].city == stop.city) sameIdx.add(j);
+    }
+    if (sameIdx.length <= 1) return baseLatLng;
+    final k = sameIdx.indexOf(index);
+    final n = sameIdx.length;
+    final angle = 2 * pi * k / n;
+    const offsetDeg = 0.004;
+    return LatLng(
+      baseLatLng.latitude + offsetDeg * cos(angle),
+      baseLatLng.longitude + offsetDeg * sin(angle),
+    );
+  }
+
+  void _buildSingleStopRoute(SellerRouteStop stop) {
+    final coord = AppConstants.cityLocations[stop.city];
+    if (coord == null) {
+      clearRoute();
+      return;
+    }
+
+    final marker = Marker(
+      markerId: MarkerId(stop.id),
+      position: LatLng(coord.lat, coord.lng),
+      infoWindow: InfoWindow(title: stop.label, snippet: 'Ден 1'),
+      icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+    );
+
+    state = state.copyWith(
+      markers: {marker},
+      polylines: const {},
+      routeOptions: [
+        {
+          'label': 'Ден 1: ${stop.label}',
+          'day': 1,
+          'ordered_stops': [stop.label],
+          'total_distance_km': 0,
+          'drive_time_readable': '0ч 0м',
+          'admin_time_minutes': _adminMinutesPerStop.round(),
+          'total_time_readable': '0ч 30м',
+          'num_stops': 1,
+          'color': _dayColors.first.value,
+        }
+      ],
+      isLoading: false,
+    );
+  }
+
+  void _buildSameCityMultiStopRoute(List<SellerRouteStop> stops) {
+    if (stops.isEmpty) {
+      clearRoute();
+      return;
+    }
+    final markers = <Marker>{};
+    for (var i = 0; i < stops.length; i++) {
+      final s = stops[i];
+      final coord = AppConstants.cityLocations[s.city];
+      if (coord == null) continue;
+      final pos = _markerPositionForStop(s, stops, i);
+      markers.add(Marker(
+        markerId: MarkerId(s.id),
+        position: pos,
+        infoWindow: InfoWindow(title: s.label, snippet: 'Ден 1'),
+        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+      ));
+    }
+    final labels = stops.map((s) => s.label).toList();
+    final adminMinutes = stops.length * _adminMinutesPerStop;
+    final totalH = adminMinutes ~/ 60;
+    final totalM = (adminMinutes % 60).round();
+    state = state.copyWith(
+      markers: markers,
+      polylines: const {},
+      routeOptions: [
+        {
+          'label': 'Ден 1: ${labels.join(' → ')}',
+          'day': 1,
+          'ordered_stops': labels,
+          'total_distance_km': 0,
+          'drive_time_readable': '0ч 0м',
+          'admin_time_minutes': adminMinutes.round(),
+          'total_time_readable': '${totalH}ч ${totalM}м',
+          'num_stops': stops.length,
+          'color': _dayColors.first.value,
+        }
+      ],
+      isLoading: false,
+    );
+  }
+
+  List<SellerRouteStop> _nearestNeighborOrderStops(List<SellerRouteStop> stops) {
+    if (stops.length <= 2) return List.from(stops);
+
+    final remaining = List<SellerRouteStop>.from(stops);
+    remaining.sort((a, b) {
+      final ca = AppConstants.cityLocations[a.city];
+      final cb = AppConstants.cityLocations[b.city];
+      if (ca == null || cb == null) return 0;
+      return ca.lng.compareTo(cb.lng);
+    });
+
+    final ordered = <SellerRouteStop>[remaining.removeAt(0)];
+
+    while (remaining.isNotEmpty) {
+      final lastCity = ordered.last.city;
+      final lastCoord = AppConstants.cityLocations[lastCity]!;
+      double bestDist = double.infinity;
+      var bestIdx = 0;
+
+      for (int i = 0; i < remaining.length; i++) {
+        final c = AppConstants.cityLocations[remaining[i].city];
+        if (c == null) continue;
+        final d = _haversineKm(lastCoord.lat, lastCoord.lng, c.lat, c.lng);
+        if (d < bestDist) {
+          bestDist = d;
+          bestIdx = i;
+        }
+      }
+      ordered.add(remaining.removeAt(bestIdx));
+    }
+    return ordered;
+  }
+
+  List<List<SellerRouteStop>> _splitIntoDaysStops(
+      List<SellerRouteStop> ordered) {
+    if (ordered.isEmpty) return [];
+    if (ordered.length == 1) return [ordered];
+
+    final days = <List<SellerRouteStop>>[];
+    var currentDay = <SellerRouteStop>[ordered.first];
+    double currentDayMinutes = _adminMinutesPerStop;
+
+    for (int i = 1; i < ordered.length; i++) {
+      final prevCity = ordered[i - 1].city;
+      final nextCity = ordered[i].city;
+
+      final driveMinutes = _estimatedDriveMinutes(prevCity, nextCity);
+      final stopCost = driveMinutes + _adminMinutesPerStop;
+
+      final pCoords = AppConstants.cityLocations[prevCity]!;
+      final nCoords = AppConstants.cityLocations[nextCity]!;
+      final distKm = _haversineKm(pCoords.lat, pCoords.lng, nCoords.lat, nCoords.lng);
+
+      if ((currentDayMinutes + stopCost > _maxDayMinutes) ||
+          (distKm > _maxClusterRadiusKm)) {
+        days.add(currentDay);
+        currentDay = <SellerRouteStop>[ordered[i]];
+        currentDayMinutes = driveMinutes + _adminMinutesPerStop;
+      } else {
+        currentDay.add(ordered[i]);
+        currentDayMinutes += stopCost;
+      }
+    }
+    if (currentDay.isNotEmpty) {
+      days.add(currentDay);
+    }
+    return days;
+  }
+
+  /// Road polyline + stats for a stop sequence (handles duplicate cities).
+  Future<({List<LatLng> points, double km, double driveMin})?>
+      _polylineForStopSegment(
+          List<SellerRouteStop> segment, String apiKey) async {
+    if (segment.length < 2) return null;
+
+    final allPoints = <LatLng>[];
+    double totalKm = 0;
+    double totalDriveMin = 0;
+
+    for (int i = 0; i < segment.length - 1; i++) {
+      final a = segment[i].city;
+      final b = segment[i + 1].city;
+
+      if (a == b) {
+        final c = AppConstants.cityLocations[a]!;
+        if (allPoints.isEmpty) allPoints.add(LatLng(c.lat, c.lng));
+        allPoints.add(LatLng(c.lat, c.lng));
+        continue;
+      }
+
+      final routeResult = await _callRoutesApi([a, b], apiKey);
+      if (routeResult != null) {
+        final durationStr = routeResult['duration'] as String? ?? '0s';
+        final driveSecs =
+            int.tryParse(durationStr.replaceAll('s', '')) ?? 0;
+        totalDriveMin += driveSecs / 60.0;
+        final distMeters =
+            (routeResult['distanceMeters'] as num?)?.toDouble() ?? 0;
+        totalKm += distMeters / 1000.0;
+        final encoded = routeResult['polyline']?['encodedPolyline']
+                as String? ??
+            '';
+        final pts = _decodePolyline(encoded);
+        if (pts.isNotEmpty) {
+          if (allPoints.isNotEmpty) {
+            final last = allPoints.last;
+            final first = pts.first;
+            if ((last.latitude - first.latitude).abs() < 1e-5 &&
+                (last.longitude - first.longitude).abs() < 1e-5) {
+              allPoints.addAll(pts.skip(1));
+            } else {
+              allPoints.addAll(pts);
+            }
+          } else {
+            allPoints.addAll(pts);
+          }
+        }
+      } else {
+        totalDriveMin += _estimatedDriveMinutes(a, b);
+        final ca = AppConstants.cityLocations[a]!;
+        final cb = AppConstants.cityLocations[b]!;
+        totalKm +=
+            _haversineKm(ca.lat, ca.lng, cb.lat, cb.lng) * _roadFactor;
+        if (allPoints.isEmpty) allPoints.add(LatLng(ca.lat, ca.lng));
+        allPoints.add(LatLng(cb.lat, cb.lng));
+      }
+    }
+
+    if (allPoints.isEmpty) return null;
+    return (points: allPoints, km: totalKm, driveMin: totalDriveMin);
+  }
+
   // ─── Haversine distance in km ───
   double _haversineKm(double lat1, double lng1, double lat2, double lng2) {
     const R = 6371.0;
@@ -76,89 +309,6 @@ class MapNotifier extends Notifier<MapState> {
     final straightKm = _haversineKm(a.lat, a.lng, b.lat, b.lng);
     final roadKm = straightKm * _roadFactor;
     return (roadKm / _avgSpeedKmh) * 60; // minutes
-  }
-
-  // ─── Order cities via nearest-neighbor starting from westernmost ───
-  List<String> _nearestNeighborOrder(List<String> cities) {
-    if (cities.length <= 2) return List.from(cities);
-
-    final remaining = List<String>.from(cities);
-
-    // Start from the westernmost city (lowest longitude)
-    remaining.sort((a, b) {
-      final ca = AppConstants.cityLocations[a];
-      final cb = AppConstants.cityLocations[b];
-      if (ca == null || cb == null) return 0;
-      return ca.lng.compareTo(cb.lng);
-    });
-
-    final ordered = <String>[remaining.removeAt(0)];
-
-    while (remaining.isNotEmpty) {
-      final lastCity = ordered.last;
-      final lastCoord = AppConstants.cityLocations[lastCity]!;
-      double bestDist = double.infinity;
-      int bestIdx = 0;
-
-      for (int i = 0; i < remaining.length; i++) {
-        final c = AppConstants.cityLocations[remaining[i]];
-        if (c == null) continue;
-        final d = _haversineKm(lastCoord.lat, lastCoord.lng, c.lat, c.lng);
-        if (d < bestDist) {
-          bestDist = d;
-          bestIdx = i;
-        }
-      }
-      ordered.add(remaining.removeAt(bestIdx));
-    }
-    return ordered;
-  }
-
-  // ─── Split ordered cities into days by time budget ───
-  // Each stop costs: driveTime(from prev) + 30min admin
-  // Day total must not exceed 8 hours (480 min)
-  List<List<String>> _splitIntoDays(List<String> orderedCities) {
-    if (orderedCities.isEmpty) return [];
-    if (orderedCities.length == 1) return [orderedCities];
-
-    final days = <List<String>>[];
-    var currentDay = <String>[orderedCities.first];
-    // First stop of the day: only admin time (you start there)
-    double currentDayMinutes = _adminMinutesPerStop;
-
-    for (int i = 1; i < orderedCities.length; i++) {
-      final prevCity = orderedCities[i - 1];
-      final nextCity = orderedCities[i];
-      
-      final driveMinutes = _estimatedDriveMinutes(prevCity, nextCity);
-      final stopCost = driveMinutes + _adminMinutesPerStop;
-      
-      // Distance check for clustering
-      final pCoords = AppConstants.cityLocations[prevCity]!;
-      final nCoords = AppConstants.cityLocations[nextCity]!;
-      final distKm = _haversineKm(pCoords.lat, pCoords.lng, nCoords.lat, nCoords.lng);
-
-      if ((currentDayMinutes + stopCost > _maxDayMinutes) || (distKm > _maxClusterRadiusKm)) {
-        // CLOSE current day
-        days.add(currentDay);
-        
-        // START new day with nextCity
-        currentDay = <String>[nextCity];
-        
-        // FIX: The driver starts from the previous city in the morning.
-        // So the new day's initial time must include the travel to this first stop.
-        currentDayMinutes = driveMinutes + _adminMinutesPerStop;
-      } else {
-        // Fits → add to current day
-        currentDay.add(nextCity);
-        currentDayMinutes += stopCost;
-      }
-    }
-    // Don't forget the last day
-    if (currentDay.isNotEmpty) {
-      days.add(currentDay);
-    }
-    return days;
   }
 
   // ─── Call Routes API for a list of cities ───
@@ -233,72 +383,57 @@ class MapNotifier extends Notifier<MapState> {
   }
 
   // ═══════════════════════════════════════════════════════════════
-  //  MAIN: Multi-day route with time-budget day splitting
+  //  MAIN: Multi-day route with time-budget day splitting (per reservation)
   // ═══════════════════════════════════════════════════════════════
-  Future<void> fetchMultiDayRoute(List<String> allCities) async {
-    if (allCities.length < 2) return;
+  Future<void> fetchMultiDayRoute(List<SellerRouteStop> allStops) async {
+    if (allStops.isEmpty) {
+      clearRoute();
+      return;
+    }
+    if (allStops.length == 1) {
+      _buildSingleStopRoute(allStops.first);
+      return;
+    }
+    final uniqueCities = allStops.map((s) => s.city).toSet();
+    if (uniqueCities.length == 1) {
+      _buildSameCityMultiStopRoute(allStops);
+      return;
+    }
+
     state = state.copyWith(isLoading: true);
 
     final apiKey = dotenv.env['MAPS_KEY'] ?? '';
 
     try {
-      // 1. Order all cities by nearest-neighbor (west → east sweep)
-      final ordered = _nearestNeighborOrder(allCities);
+      final ordered = _nearestNeighborOrderStops(allStops);
+      final days = _splitIntoDaysStops(ordered);
 
-      // 2. Split into days by time budget (drive + 30min admin ≤ 8h)
-      final days = _splitIntoDays(ordered);
-
-      // 3. For each day, build route with inter-day travel link
       final allMarkers = <Marker>{};
       final allPolylines = <Polyline>{};
       final allRouteOptions = <Map<String, dynamic>>[];
 
       for (int dayIdx = 0; dayIdx < days.length; dayIdx++) {
-        final dayCities = days[dayIdx];
+        final dayStops = days[dayIdx];
         final dayColor = _dayColors[dayIdx % _dayColors.length];
         final dayNum = dayIdx + 1;
-        final numStops = dayCities.length;
+        final numStops = dayStops.length;
 
-        // Build full route cities: if not first day, prepend last city
-        // of previous day as the travel start
-        List<String> routeCities;
+        final List<SellerRouteStop> routeSegment;
         if (dayIdx > 0) {
-          final prevLastCity = days[dayIdx - 1].last;
-          routeCities = [prevLastCity, ...dayCities];
+          routeSegment = [days[dayIdx - 1].last, ...dayStops];
         } else {
-          routeCities = dayCities;
+          routeSegment = dayStops;
         }
 
-        final routeResult = await _callRoutesApi(routeCities, apiKey);
+        final seg = routeSegment.length >= 2
+            ? await _polylineForStopSegment(routeSegment, apiKey)
+            : null;
 
-        if (routeResult != null) {
-          // Parse real driving duration from API
-          final durationStr = routeResult['duration'] as String? ?? '0s';
-          final driveSecs =
-              int.tryParse(durationStr.replaceAll('s', '')) ?? 0;
-          final driveMinutes = driveSecs / 60.0;
+        final points = seg?.points ?? <LatLng>[];
+        final totalKm = seg?.km ?? 0.0;
+        final driveMinutes = seg?.driveMin ?? 0.0;
 
-          // Admin time: 30 min per stop city (not the travel-from city)
-          final adminMinutes = numStops * _adminMinutesPerStop;
-          final totalMinutes = driveMinutes + adminMinutes;
-          final totalH = totalMinutes ~/ 60;
-          final totalM = (totalMinutes % 60).round();
-
-          final driveH = driveSecs ~/ 3600;
-          final driveM = (driveSecs % 3600) ~/ 60;
-
-          // Distance
-          final distMeters =
-              (routeResult['distanceMeters'] as num?)?.toDouble() ?? 0;
-          final totalKm = (distMeters / 1000).round();
-
-          // Decode polyline
-          final encoded = routeResult['polyline']?['encodedPolyline']
-                  as String? ??
-              '';
-          final points = _decodePolyline(encoded);
-
-          // Polyline
+        if (points.length > 1) {
           allPolylines.add(Polyline(
             polylineId: PolylineId('day_${dayNum}_route'),
             points: points,
@@ -308,38 +443,49 @@ class MapNotifier extends Notifier<MapState> {
             startCap: Cap.roundCap,
             endCap: Cap.roundCap,
           ));
-
-          // Markers
-          for (final city in routeCities) {
-            final coord = AppConstants.cityLocations[city];
-            if (coord == null) continue;
-            allMarkers.add(Marker(
-              markerId: MarkerId(city),
-              position: LatLng(coord.lat, coord.lng),
-              infoWindow: InfoWindow(title: city, snippet: 'Ден $dayNum'),
-              icon: BitmapDescriptor.defaultMarkerWithHue(
-                dayIdx == 0
-                    ? BitmapDescriptor.hueRed
-                    : dayIdx == 1
-                        ? BitmapDescriptor.hueAzure
-                        : BitmapDescriptor.hueOrange,
-              ),
-            ));
-          }
-
-          // Route option data
-          allRouteOptions.add({
-            'label': 'Ден $dayNum: ${routeCities.join(' → ')}',
-            'day': dayNum,
-            'ordered_stops': routeCities,
-            'total_distance_km': totalKm,
-            'drive_time_readable': '${driveH}ч ${driveM}м',
-            'admin_time_minutes': adminMinutes.round(),
-            'total_time_readable': '${totalH}ч ${totalM}м',
-            'num_stops': numStops,
-            'color': dayColor.value,
-          });
         }
+
+        for (var i = 0; i < dayStops.length; i++) {
+          final s = dayStops[i];
+          final coord = AppConstants.cityLocations[s.city];
+          if (coord == null) continue;
+          final pos = _markerPositionForStop(s, dayStops, i);
+          allMarkers.add(Marker(
+            markerId: MarkerId('${s.id}_d$dayNum'),
+            position: pos,
+            infoWindow: InfoWindow(title: s.label, snippet: 'Ден $dayNum'),
+            icon: BitmapDescriptor.defaultMarkerWithHue(
+              dayIdx == 0
+                  ? BitmapDescriptor.hueRed
+                  : dayIdx == 1
+                      ? BitmapDescriptor.hueAzure
+                      : BitmapDescriptor.hueOrange,
+            ),
+          ));
+        }
+
+        final adminMinutes = numStops * _adminMinutesPerStop;
+        final totalMinutes = driveMinutes + adminMinutes;
+        final totalH = totalMinutes ~/ 60;
+        final totalM = (totalMinutes % 60).round();
+
+        final driveSecs = (driveMinutes * 60).round();
+        final driveH = driveSecs ~/ 3600;
+        final driveM = (driveSecs % 3600) ~/ 60;
+
+        final labels = dayStops.map((s) => s.label).toList();
+
+        allRouteOptions.add({
+          'label': 'Ден $dayNum: ${labels.join(' → ')}',
+          'day': dayNum,
+          'ordered_stops': labels,
+          'total_distance_km': totalKm.round(),
+          'drive_time_readable': '${driveH}ч ${driveM}м',
+          'admin_time_minutes': adminMinutes.round(),
+          'total_time_readable': '${totalH}ч ${totalM}м',
+          'num_stops': numStops,
+          'color': dayColor.value,
+        });
       }
 
       state = state.copyWith(

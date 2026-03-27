@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/models.dart';
+import '../models/route_stop.dart';
 import '../services/auth_service.dart';
 import '../services/product_service.dart';
 import '../services/storage_service.dart';
@@ -262,68 +263,135 @@ final notificationsProvider =
 
 // ─── Seller's Route Info (Cities + Reservations) ───
 class SellerRouteInfo {
-  final List<String> uniqueCities;
+  /// One stop per deliverable reservation (plus optional depot), not deduped by city.
+  final List<SellerRouteStop> stops;
   final int totalReservations;
   final List<Reservation> reservations;
 
   SellerRouteInfo({
-    required this.uniqueCities,
+    required this.stops,
     required this.totalReservations,
     required this.reservations,
   });
 }
 
+/// Seller delivery route: built from **all** Firebase reservations for this seller
+/// that are still deliverable (active / confirmed), using listing city when possible,
+/// then buyer profile city as fallback for map coordinates.
 final sellerReservationCitiesProvider = StreamProvider.family<SellerRouteInfo, String>((ref, sellerId) {
   final firestore = ref.watch(firestoreProvider);
   final sellerAsync = ref.watch(reactiveSellerProvider);
-  
+
+  /// Listing id → city string as stored in Firestore (for route resolution).
+  Future<Map<String, String>> fetchListingCities() async {
+    final productSnap = await firestore
+        .collection('users')
+        .doc(sellerId)
+        .collection('products')
+        .get();
+
+    final map = <String, String>{};
+    for (final productDoc in productSnap.docs) {
+      final productData = productDoc.data();
+      final listingsSnap = await productDoc.reference.collection('listings').get();
+      for (final listingDoc in listingsSnap.docs) {
+        final data = listingDoc.data();
+        final city =
+            (data['city'] ?? productData['origin'] ?? productData['mainCity']) as String? ?? '';
+        map[listingDoc.id] = city;
+      }
+    }
+    return map;
+  }
+
   return firestore
       .collection('reservations')
-      .where('sellerId', isEqualTo: sellerId)
       .snapshots()
       .asyncMap((snap) async {
-    final reservations = snap.docs.map((d) {
-      final data = d.data();
-      return Reservation.fromJson(data, d.id);
-    }).toList();
+    final listingCityById = await fetchListingCities();
+    final sellerListingIds = listingCityById.keys.toSet();
 
-    // Get unique buyer IDs
-    final buyerIds = reservations
-        .map((r) => r.buyerId)
-        .where((id) => id.isNotEmpty)
-        .toSet()
+    final all = snap.docs
+        .map((d) => Reservation.fromJson(d.data(), d.id))
+        .where((r) =>
+            r.sellerId == sellerId ||
+            (r.listingId.isNotEmpty && sellerListingIds.contains(r.listingId)))
         .toList();
 
-    // Look up each buyer's city from their user profile
-    final List<String> cities = [];
-    for (final buyerId in buyerIds) {
+    // Every reservation that still counts for delivery (not cancelled / completed).
+    final reservations = all.where((r) {
+      final s = r.status;
+      return s != AppConstants.reservationCancelled && s != AppConstants.reservationCompleted;
+    }).toList();
+
+    final buyerCityCache = <String, String>{};
+
+    Future<String?> buyerLocationRaw(String buyerId) async {
+      if (buyerId.isEmpty) return null;
+      if (buyerCityCache.containsKey(buyerId)) {
+        final c = buyerCityCache[buyerId]!;
+        return c.isEmpty ? null : c;
+      }
+      var raw = '';
       final userDoc = await firestore.collection('users').doc(buyerId).get();
       if (userDoc.exists) {
         final data = userDoc.data()!;
-        // Use preferredCity for buyers, mainCity for sellers
-        final rawCity = (data['preferredCity'] as String?) ??
-                        (data['mainCity'] as String?) ??
-                        '';
-        final city = AppConstants.normalizeCityName(rawCity);
-        if (city.isNotEmpty && !cities.contains(city)) {
-          cities.add(city);
+        raw = (data['preferredCity'] as String?) ??
+            (data['mainCity'] as String?) ??
+            (data['city'] as String?) ??
+            (data['deliveryCity'] as String?) ??
+            '';
+      }
+      if (raw.isEmpty) {
+        final buyerDoc = await firestore.collection('buyers').doc(buyerId).get();
+        if (buyerDoc.exists) {
+          final data = buyerDoc.data()!;
+          raw = (data['preferredCity'] as String?) ??
+              (data['mainCity'] as String?) ??
+              (data['city'] as String?) ??
+              (data['deliveryCity'] as String?) ??
+              '';
         }
+      }
+      buyerCityCache[buyerId] = raw;
+      return raw.trim().isEmpty ? null : raw;
+    }
+
+    final List<SellerRouteStop> stops = [];
+
+    // Optional start point: seller base (routing anchor).
+    final seller = sellerAsync.value;
+    if (seller != null && seller.mainCity.isNotEmpty) {
+      final mc = AppConstants.resolveCityForMap(seller.mainCity);
+      if (mc != null) {
+        stops.add(SellerRouteStop(
+          id: '__depot__',
+          city: mc,
+          label: 'Старт · $mc',
+        ));
       }
     }
 
-    // Add seller's main city as the starting point
-    final seller = sellerAsync.value;
-    if (seller != null && seller.mainCity.isNotEmpty) {
-      if (!cities.contains(seller.mainCity)) {
-        cities.insert(0, seller.mainCity);
-      } else {
-        cities.remove(seller.mainCity);
-        cities.insert(0, seller.mainCity);
+    // One stop per reservation. Prefer **buyer’s** city (profile) so each stop can differ;
+    // reservation/listing city often mirrors the offer location for every row.
+    for (final r in reservations) {
+      String? city = AppConstants.resolveCityForMap(await buyerLocationRaw(r.buyerId));
+      city ??= AppConstants.resolveCityForMap(r.city);
+      city ??= AppConstants.resolveCityForMap(listingCityById[r.listingId]);
+      if (city != null) {
+        final name = (r.buyerName?.trim().isNotEmpty == true)
+            ? r.buyerName!.trim()
+            : 'Клиент';
+        stops.add(SellerRouteStop(
+          id: r.id,
+          city: city,
+          label: '$city · $name',
+        ));
       }
     }
-    
+
     return SellerRouteInfo(
-      uniqueCities: cities,
+      stops: stops,
       totalReservations: reservations.length,
       reservations: reservations,
     );

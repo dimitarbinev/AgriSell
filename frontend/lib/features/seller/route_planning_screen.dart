@@ -3,10 +3,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../../shared/providers/map_provider.dart';
 import '../../shared/providers/providers.dart';
+import '../../shared/models/route_stop.dart';
 import '../../core/theme.dart';
-import '../../core/constants.dart';
 import '../../shared/widgets/nature_scaffold.dart';
 
+bool _sameStopsList(List<SellerRouteStop>? a, List<SellerRouteStop> b) {
+  if (a == null || a.length != b.length) return false;
+  for (var i = 0; i < a.length; i++) {
+    if (a[i].id != b[i].id || a[i].city != b[i].city) return false;
+  }
+  return true;
+}
 
 class RoutePlanningScreen extends ConsumerWidget {
   const RoutePlanningScreen({super.key});
@@ -24,12 +31,21 @@ class RoutePlanningScreen extends ConsumerWidget {
     final mapState = ref.watch(mapProvider);
     final citiesAsync = ref.watch(sellerReservationCitiesProvider(user.uid));
 
-    // Listen for city changes to trigger route calculation
+    // Firestore stream: refetch route when stop list changes.
     ref.listen(sellerReservationCitiesProvider(user.uid), (prev, next) {
       next.whenData((info) {
-        if (info.uniqueCities.length > 1 && mapState.routeOptions.isEmpty && !mapState.isLoading) {
-          ref.read(mapProvider.notifier).fetchMultiDayRoute(info.uniqueCities);
+        final stops = info.stops;
+        final notifier = ref.read(mapProvider.notifier);
+        if (stops.isEmpty) {
+          notifier.clearRoute();
+          return;
         }
+        final prevStops = switch (prev) {
+          AsyncData(:final value) => value.stops,
+          _ => null,
+        };
+        if (_sameStopsList(prevStops, stops)) return;
+        notifier.fetchMultiDayRoute(stops);
       });
     });
 
@@ -40,11 +56,11 @@ class RoutePlanningScreen extends ConsumerWidget {
         backgroundColor: Colors.transparent,
         elevation: 0,
         actions: [
-          if (citiesAsync.hasValue && citiesAsync.value!.uniqueCities.length > 1)
+          if (citiesAsync.hasValue && citiesAsync.value!.stops.isNotEmpty)
             IconButton(
               icon: const Icon(Icons.refresh, color: Colors.white),
               onPressed: () {
-                ref.read(mapProvider.notifier).fetchMultiDayRoute(citiesAsync.value!.uniqueCities);
+                ref.read(mapProvider.notifier).fetchMultiDayRoute(citiesAsync.value!.stops);
               },
             ),
         ],
@@ -77,14 +93,6 @@ class RoutePlanningScreen extends ConsumerWidget {
                       myLocationEnabled: true,
                       zoomControlsEnabled: false,
                       mapType: MapType.normal,
-                      onMapCreated: (controller) {
-                        // Initial fetch if data is already available
-                        citiesAsync.whenData((info) {
-                          if (info.uniqueCities.length > 1 && mapState.routeOptions.isEmpty) {
-                            ref.read(mapProvider.notifier).fetchMultiDayRoute(info.uniqueCities);
-                          }
-                        });
-                      },
                     );
                   },
                   loading: () => const Center(child: CircularProgressIndicator()),
@@ -264,7 +272,7 @@ class _DayRouteCard extends StatelessWidget {
                 const SizedBox(height: 8),
                 for (int i = 0; i < stops.length; i++)
                   _StopTile(
-                    city: stops[i],
+                    label: stops[i] as String,
                     isFirst: i == 0,
                     isLast: i == stops.length - 1,
                     color: color,
@@ -279,13 +287,13 @@ class _DayRouteCard extends StatelessWidget {
 }
 
 class _StopTile extends StatelessWidget {
-  final String city;
+  final String label;
   final bool isFirst;
   final bool isLast;
   final Color color;
 
   const _StopTile({
-    required this.city,
+    required this.label,
     required this.isFirst,
     required this.isLast,
     required this.color,
@@ -317,7 +325,7 @@ class _StopTile extends StatelessWidget {
           ),
           const SizedBox(width: 12),
           Text(
-            city,
+            label,
             style: const TextStyle(fontSize: 14, color: AppTheme.textPrimary),
           ),
           const Spacer(),

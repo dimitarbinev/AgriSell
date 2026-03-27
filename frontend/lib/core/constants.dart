@@ -1,7 +1,7 @@
 class AppConstants {
   AppConstants._();
 
-  static const String appName = 'АгроСтрийт Маркет';
+  static const String appName = 'AgriSell';
   static const String tagline = 'Пресни продукти от фермата до улицата';
 
   // ─── Категории продукти ───
@@ -4572,6 +4572,29 @@ class AppConstants {
       if (city.toLowerCase() == lower) return city;
     }
     return input;
+  }
+
+  /// Maps free-text / village names from Firebase to a key in [cityLocations], or null.
+  static String? resolveCityForMap(String? input) {
+    if (input == null || input.trim().isEmpty) return null;
+    final n = normalizeCityName(input.trim());
+    if (cityLocations.containsKey(n)) return n;
+    final lower = n.toLowerCase();
+    final compact = lower.replaceAll(RegExp(r'\s+'), '');
+    const aliases = {
+      'rozovadolina': 'Враца',
+      'розовадолина': 'Враца',
+    };
+    if (aliases.containsKey(compact)) return aliases[compact];
+    if (aliases.containsKey(lower)) return aliases[lower];
+    for (final key in cityLocations.keys) {
+      final kl = key.toLowerCase();
+      if (lower == kl) return key;
+      if (lower.length >= 4 && (lower.contains(kl) || kl.contains(lower))) {
+        return key;
+      }
+    }
+    return null;
   }
 
   // ─── Сезони ───

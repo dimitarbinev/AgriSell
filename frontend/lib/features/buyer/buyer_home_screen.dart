@@ -149,7 +149,7 @@ class _BuyerHomeScreenState extends ConsumerState<BuyerHomeScreen> {
                   isSelected: _selectedCategory == null,
                   onTap: () => setState(() => _selectedCategory = null),
                 ),
-                ...AppConstants.productCategories.take(5).map(
+                ...AppConstants.productCategories.take(10).map(
                       (c) => _CategoryChip(
                         label: c,
                         isSelected: _selectedCategory == c,
