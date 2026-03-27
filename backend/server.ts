@@ -6,7 +6,7 @@ import authRoutes from "./routing/authRoutes";
 import sellerRoutes from "./routing/sellerRoutes";
 import buyerRoutes from "./routing/buyerRoutes";
 
-import {verifyToken, sellerLimiter} from "./middleware/middleware";
+import {verifyToken, sellerLimiter, error_lister} from "./middleware/middleware";
 import {availableListings} from "./controllers/buyerControllers";
 
 const app = express();
@@ -25,6 +25,8 @@ app.get("/buyer/available_listings", verifyToken, sellerLimiter, (req, res, next
 }, availableListings);
 
 app.use("/buyer", buyerRoutes);
+
+app.use(error_lister);
 
 
 app.listen(PORT, () => {

@@ -24,7 +24,7 @@ import 'features/buyer/buyer_seller_profile_screen.dart';
 import 'features/buyer/saved_sellers_screen.dart';
 import 'features/buyer/my_reservations_screen.dart';
 import 'features/buyer/buyer_reservation_detail_screen.dart';
-import 'features/buyer/leave_review_screen.dart';
+
 import 'features/buyer/buyer_profile_screen.dart';
 import 'features/notifications/notifications_screen.dart';
 
