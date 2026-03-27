@@ -52,8 +52,12 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
         // User is authenticated — try to restore their session
         final lastRoute = await storage.getLastRoute();
 
-        // If we have a valid saved route, go there directly
-        if (lastRoute != null && lastRoute != '/splash' && lastRoute != '/login' && lastRoute != '/') {
+        // If we have a valid saved route, go there directly (skipping legacy onboarding)
+        if (lastRoute != null && 
+            lastRoute != '/splash' && 
+            lastRoute != '/login' && 
+            lastRoute != '/' &&
+            !lastRoute.contains('onboarding')) {
           if (mounted) context.go(lastRoute);
           return;
         }
