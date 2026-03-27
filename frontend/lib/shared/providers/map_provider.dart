@@ -47,9 +47,9 @@ const _dayColors = [
 // Constants for day-splitting
 const double _adminMinutesPerStop = 30.0; // serving clients at each stop
 const double _maxDayMinutes = 360.0; // 6 hours = 360 minutes (stricter limit as requested)
-const double _avgSpeedKmh = 50.0; // conservative average speed for logistics in Bulgaria
-const double _roadFactor = 1.8; // roads can be significantly longer than straight lines
-const double _maxClusterRadiusKm = 80.0; // max distance between stops to keep in same cluster
+const double _avgSpeedKmh = 60.0; // more balanced average speed
+const double _roadFactor = 1.5; // common road curvature factor
+const double _maxClusterRadiusKm = 200.0; // max distance between stops (per user request)
 
 class MapNotifier extends Notifier<MapState> {
   @override
