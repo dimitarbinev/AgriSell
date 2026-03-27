@@ -20,27 +20,47 @@ firebase_available = False
 
 try:
     if not firebase_admin._apps:
-        service_account_info = {
-            "type": os.getenv("FIREBASE_TYPE"),
-            "project_id": os.getenv("FIREBASE_PROJECT_ID"),
-            "private_key_id": os.getenv("FIREBASE_PRIVATE_KEY_ID"),
-            "private_key": os.getenv("FIREBASE_PRIVATE_KEY").replace("\\n", "\n") if os.getenv("FIREBASE_PRIVATE_KEY") else None,
-            "client_email": os.getenv("FIREBASE_CLIENT_EMAIL"),
-            "client_id": os.getenv("FIREBASE_CLIENT_ID"),
-            "auth_uri": os.getenv("FIREBASE_AUTH_URI"),
-            "token_uri": os.getenv("FIREBASE_TOKEN_URI"),
-            "auth_provider_x509_cert_url": os.getenv("FIREBASE_AUTH_PROVIDER_X509_CERT_URL"),
-            "client_x509_cert_url": os.getenv("FIREBASE_CLIENT_X509_CERT_URL"),
-            "universe_domain": os.getenv("FIREBASE_UNIVERSE_DOMAIN")
-        }
-        service_account_info = {k: v for k, v in service_account_info.items() if v is not None}
-        if service_account_info:
+        # 1. Try to load from local JSON file (as seen in Telegram_bot/test.py)
+        json_path = os.path.join(os.path.dirname(__file__), "Telegram_bot", "hacktues12-firebase-adminsdk-fbsvc-7ce9f543c1.json")
+        
+        if os.path.exists(json_path):
+            import json
+            with open(json_path, "r") as f:
+                service_account_info = json.load(f)
+            
+            # Use environment variables if they provide more up-to-date keys
+            pk_id = os.getenv("PRIVATE_KEY_ID")
+            pk = os.getenv("PRIVATE_KEY")
+            if pk_id: service_account_info["private_key_id"] = pk_id
+            if pk: service_account_info["private_key"] = pk.replace("\\n", "\n")
+            
             cred = credentials.Certificate(service_account_info)
             firebase_admin.initialize_app(cred)
-            db = firestore.client()
-            firebase_available = True
+        else:
+            # 2. Fallback to individual env vars
+            service_account_info = {
+                "type": os.getenv("FIREBASE_TYPE"),
+                "project_id": os.getenv("FIREBASE_PROJECT_ID"),
+                "private_key_id": os.getenv("PRIVATE_KEY_ID") or os.getenv("FIREBASE_PRIVATE_KEY_ID"),
+                "private_key": (os.getenv("PRIVATE_KEY") or os.getenv("FIREBASE_PRIVATE_KEY")).replace("\\n", "\n") if (os.getenv("PRIVATE_KEY") or os.getenv("FIREBASE_PRIVATE_KEY")) else None,
+                "client_email": os.getenv("FIREBASE_CLIENT_EMAIL"),
+                "client_id": os.getenv("FIREBASE_CLIENT_ID"),
+                "auth_uri": os.getenv("FIREBASE_AUTH_URI"),
+                "token_uri": os.getenv("FIREBASE_TOKEN_URI"),
+                "auth_provider_x509_cert_url": os.getenv("FIREBASE_AUTH_PROVIDER_X509_CERT_URL"),
+                "client_x509_cert_url": os.getenv("FIREBASE_CLIENT_X509_CERT_URL"),
+                "universe_domain": os.getenv("FIREBASE_UNIVERSE_DOMAIN")
+            }
+            service_account_info = {k: v for k, v in service_account_info.items() if v is not None}
+            if service_account_info:
+                cred = credentials.Certificate(service_account_info)
+                firebase_admin.initialize_app(cred)
+        
+        db = firestore.client()
+        firebase_available = True
+        print("✅ Firebase initialized successfully.")
 except Exception as e:
-    print(f"Firebase initialization error: {e}")
+    print(f"❌ Firebase initialization error: {e}")
 
 # -------------------------------------------------------
 # Config & App Setup
