@@ -10,7 +10,7 @@ class BuyerShell extends StatelessWidget {
     final location = GoRouterState.of(context).uri.toString();
     if (location.startsWith('/buyer/map')) return 1;
     if (location.startsWith('/buyer/reservations')) return 2;
-    if (location.startsWith('/buyer/profile')) return 3;
+    if (location.startsWith('/buyer/profile') || location.contains('saved-sellers')) return 3;
     return 0;
   }
 

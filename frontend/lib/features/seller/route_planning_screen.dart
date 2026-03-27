@@ -16,14 +16,17 @@ class RoutePlanningScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(authStateProvider).value;
-    if (user == null) return const Scaffold(body: Center(child: Text('Please log in')));
+    if (user == null) {
+      return const Scaffold(body: Center(child: Text('Please log in')));
+    }
 
     final listingsAsync = ref.watch(sellerListingsProvider(user.uid));
     final mapState = ref.watch(mapProvider);
 
     return NatureScaffold(
       appBar: AppBar(
-        title: const Text('Планиране на маршрут', style: TextStyle(color: Colors.white)),
+        title: const Text('Маршрут за доставка',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         backgroundColor: Colors.transparent,
         elevation: 0,
       ),
@@ -31,31 +34,16 @@ class RoutePlanningScreen extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-              child: Row(
-                children: [
-                  const Expanded(
-                    child: Text('Route Planning',
-                        style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: AppTheme.textPrimary)),
-                  ),
-                  if (mapState.isLoading)
-                    const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.primaryGreen)),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // ── Map ──
+            // ── Map Container ──
             Expanded(
               flex: 3,
               child: Container(
-                margin: const EdgeInsets.symmetric(horizontal: 20),
+                margin: const EdgeInsets.symmetric(horizontal: 16),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
                   color: AppTheme.cardSurface,
-                  border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.06)),
+                  boxShadow: AppTheme.cardShadow,
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
                 ),
                 clipBehavior: Clip.antiAlias,
                 child: listingsAsync.when(
@@ -72,10 +60,7 @@ class RoutePlanningScreen extends ConsumerWidget {
                       mapType: MapType.normal,
                       onMapCreated: (controller) {
                         if (mapState.routeOptions.isEmpty) {
-                          // Demo: 6 cities across Bulgaria
-                          ref
-                              .read(mapProvider.notifier)
-                              .fetchMultiDayRoute([
+                          ref.read(mapProvider.notifier).fetchMultiDayRoute([
                             'Pernik',
                             'Sofia',
                             'Vratsa',
@@ -88,87 +73,62 @@ class RoutePlanningScreen extends ConsumerWidget {
                     );
                   },
                   loading: () => const Center(child: CircularProgressIndicator()),
-                  error: (err, _) => Center(child: Text('Error loading listings')),
+                  error: (err, _) => const Center(child: Text('Error loading map')),
                 ),
               ),
             ),
             const SizedBox(height: 16),
 
-            // ── Day legend ──
+            // ── Day Legend ──
             if (mapState.routeOptions.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Row(
-                  children: [
-                    for (final opt in mapState.routeOptions) ...[
-                      Container(
-                        width: 12,
-                        height: 12,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Color(
-                              (opt as Map)['color'] as int? ?? 0xFF2ECC71),
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      for (final opt in mapState.routeOptions) ...[
+                        _LegendItem(
+                          label: 'Ден ${opt['day']}',
+                          color: Color((opt as Map)['color'] as int? ?? 0xFF2E7D32),
                         ),
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        'Ден ${opt['day']}',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: AppTheme.textSecondary,
-                        ),
-                      ),
-                      const SizedBox(width: 16),
+                        const SizedBox(width: 12),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
 
-            // ── Per-day route cards ──
+            // ── Route Details List ──
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              child: Text(
+                'Вашият план за седмицата',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: AppTheme.textPrimary,
+                ),
+              ),
+            ),
             Expanded(
               flex: 2,
-              child: ListView(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                children: [
-                   Text(
-                    mapState.routeOptions.isNotEmpty 
-                      ? 'Best Route: ${mapState.routeOptions.first['label']}' 
-                      : 'Recommended Stops',
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)
-                  ),
-                  const SizedBox(height: 12),
-                  if (mapState.isLoading)
-                    const Center(child: Padding(
-                      padding: EdgeInsets.only(top: 40),
-                      child: CircularProgressIndicator(color: AppTheme.primaryGreen),
-                    ))
-                  else if (mapState.routeOptions.isEmpty)
-                    const Center(child: Padding(
-                      padding: EdgeInsets.only(top: 40),
-                      child: Text('No routes found for active listings', style: TextStyle(color: AppTheme.textSecondary)),
-                    ))
-                  else
-                    ...(() {
-                      final routeInfo = mapState.routeOptions.first;
-                      final stops = routeInfo['ordered_stops'] as List;
-                      final totalProfit = (routeInfo['estimated_profit_bgn'] as num).toDouble();
-                      final totalDistance = (routeInfo['total_distance_km'] as num).toDouble();
-                      
-                      return stops.asMap().entries.map((e) {
-                        return _StopCard(
-                          rank: e.key + 1,
-                          city: e.value,
-                          isLast: e.key == stops.length - 1,
-                          totalProfit: totalProfit,
-                          totalDistance: totalDistance,
-                          time: routeInfo['travel_time_readable'],
-                        );
-                      });
-                    }()),
-                ],
-              ),
+              child: mapState.isLoading
+                  ? const Center(child: CircularProgressIndicator(color: AppTheme.primaryGreen))
+                  : mapState.routeOptions.isEmpty
+                      ? const Center(
+                          child: Text('Няма планирани маршрути',
+                              style: TextStyle(color: AppTheme.textSecondary)))
+                      : ListView.builder(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          itemCount: mapState.routeOptions.length,
+                          itemBuilder: (context, index) {
+                            return _DayRouteCard(
+                              routeInfo: mapState.routeOptions[index] as Map<String, dynamic>,
+                            );
+                          },
+                        ),
             ),
           ],
         ),
@@ -177,7 +137,36 @@ class RoutePlanningScreen extends ConsumerWidget {
   }
 }
 
-/// Card showing analysis for one day's route
+class _LegendItem extends StatelessWidget {
+  final String label;
+  final Color color;
+
+  const _LegendItem({required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(shape: BoxShape.circle, color: color),
+        ),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: AppTheme.textSecondary,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _DayRouteCard extends StatelessWidget {
   final Map<String, dynamic> routeInfo;
 
@@ -185,49 +174,108 @@ class _DayRouteCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final label = routeInfo['label'] as String? ?? 'Route';
+    final dayNum = routeInfo['day'] ?? '?';
     final stops = routeInfo['ordered_stops'] as List? ?? [];
     final distKm = routeInfo['total_distance_km'] ?? 0;
-    final driveTime = routeInfo['drive_time_readable'] ?? '';
-    final adminMin = routeInfo['admin_time_minutes'] ?? 0;
     final totalTime = routeInfo['total_time_readable'] ?? '';
-    final numStops = routeInfo['num_stops'] ?? stops.length;
-    final colorValue = routeInfo['color'] as int?;
-    final color =
-        colorValue != null ? Color(colorValue) : AppTheme.primaryGreen;
+    final driveTime = routeInfo['drive_time_readable'] ?? '';
+    final color = Color(routeInfo['color'] as int? ?? 0xFF2E7D32);
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
-      decoration: glassDecoration(),
-      child: Row(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: glassDecoration(radius: AppTheme.radiusMedium),
+      child: ExpansionTile(
+        initiallyExpanded: true,
+        shape: const RoundedRectangleBorder(side: BorderSide.none),
+        collapsedShape: const RoundedRectangleBorder(side: BorderSide.none),
+        leading: Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(shape: BoxShape.circle, color: color.withValues(alpha: 0.2)),
+          child: Center(
+              child: Text('$dayNum',
+                  style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 16))),
+        ),
+        title: Text(
+          'Ден $dayNum: ${stops.length} спирки',
+          style: const TextStyle(fontWeight: FontWeight.w700, color: AppTheme.textPrimary),
+        ),
+        subtitle: Text(
+          '$distKm км · Общо $totalTime ($driveTime път)',
+          style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+        ),
         children: [
-          Container(
-            width: 32, height: 32,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: AppTheme.primaryGradient,
-            ),
-            child: Center(child: Text('$rank', style: const TextStyle(fontWeight: FontWeight.w800, color: Colors.white, fontSize: 14))),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(city, style: const TextStyle(fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
-                if (isLast)
-                   Text('Total: ${totalDistance.toStringAsFixed(0)} km · $time',
-                      style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary))
-                else
-                   const Text('Recommended Stop',
-                      style: TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
+                const Divider(height: 1, thickness: 0.5),
+                const SizedBox(height: 8),
+                for (int i = 0; i < stops.length; i++)
+                  _StopTile(
+                    city: stops[i],
+                    isFirst: i == 0,
+                    isLast: i == stops.length - 1,
+                    color: color,
+                  ),
               ],
             ),
           ),
-          if (isLast)
-            Text('${totalProfit.toStringAsFixed(0)} лв',
-                style: const TextStyle(fontWeight: FontWeight.w700, color: AppTheme.accentGreen)),
+        ],
+      ),
+    );
+  }
+}
+
+class _StopTile extends StatelessWidget {
+  final String city;
+  final bool isFirst;
+  final bool isLast;
+  final Color color;
+
+  const _StopTile({
+    required this.city,
+    required this.isFirst,
+    required this.isLast,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Column(
+            children: [
+              Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: color,
+                ),
+              ),
+              if (!isLast)
+                Container(
+                  width: 2,
+                  height: 20,
+                  color: color.withValues(alpha: 0.3),
+                ),
+            ],
+          ),
+          const SizedBox(width: 12),
+          Text(
+            city,
+            style: const TextStyle(fontSize: 14, color: AppTheme.textPrimary),
+          ),
+          const Spacer(),
+          if (isFirst)
+             const Icon(Icons.departure_board, size: 14, color: AppTheme.textTertiary)
+          else if (isLast)
+             const Icon(Icons.flag, size: 14, color: AppTheme.textTertiary)
+          else
+             const Icon(Icons.store, size: 14, color: AppTheme.textTertiary),
         ],
       ),
     );

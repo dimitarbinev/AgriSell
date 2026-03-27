@@ -127,6 +127,10 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: '/buyer/profile',
             builder: (context, state) => const BuyerProfileScreen(),
           ),
+          GoRoute(
+            path: '/buyer/saved-sellers',
+            builder: (context, state) => const SavedSellersScreen(),
+          ),
         ],
       ),
       GoRoute(
@@ -144,10 +148,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => BuyerReservationDetailScreen(
           reservationId: state.pathParameters['id']!,
         ),
-      ),
-      GoRoute(
-        path: '/buyer/saved-sellers',
-        builder: (context, state) => const SavedSellersScreen(),
       ),
     ],
     redirect: (context, state) {
