@@ -185,18 +185,16 @@ class _BuyerListingDetailScreenState extends ConsumerState<BuyerListingDetailScr
                           style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: AppTheme.accentGreen)),
                       const SizedBox(height: 16),
 
-                      // Info Grid
-                      GridView.count(
-                        crossAxisCount: 2,
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        mainAxisSpacing: 10, crossAxisSpacing: 10,
-                        childAspectRatio: 2.2,
+                      // Scaled Info Section
+                      _InfoTile(label: 'Произход', value: listing.city, isFullWidth: true),
+                      const SizedBox(height: 10),
+                      _InfoTile(label: 'Категория', value: listing.productCategory, isFullWidth: true),
+                      const SizedBox(height: 10),
+                      Row(
                         children: [
-                          _InfoTile(label: 'Произход', value: listing.city),
-                          _InfoTile(label: 'Категория', value: listing.productCategory),
-                          _InfoTile(label: 'Остатък', value: '${(listing.availableQuantity - listing.requestedQuantity).toStringAsFixed(0)} кг'),
-                          _InfoTile(label: 'Цел', value: '${listing.minThreshold.toStringAsFixed(0)} кг'),
+                          Expanded(child: _InfoTile(label: 'Остатък', value: '${(listing.availableQuantity - listing.requestedQuantity).toStringAsFixed(0)} кг')),
+                          const SizedBox(width: 10),
+                          Expanded(child: _InfoTile(label: 'Цел', value: '${listing.minThreshold.toStringAsFixed(0)} кг')),
                         ],
                       ),
                       const SizedBox(height: 16),
@@ -240,7 +238,7 @@ class _BuyerListingDetailScreenState extends ConsumerState<BuyerListingDetailScr
                       ),
                       const SizedBox(height: 20),
 
-                      // Reservations Section (REAL DATA)
+                      // Reservations Section
                       reservationsAsync.when(
                         data: (reservations) {
                           if (reservations.isEmpty) return const SizedBox.shrink();
@@ -398,7 +396,6 @@ class _BuyerListingDetailScreenState extends ConsumerState<BuyerListingDetailScr
                                           ScaffoldMessenger.of(context).showSnackBar(
                                             const SnackBar(content: Text('Резервацията е подадена успешно!')),
                                           );
-                                          // Clear controllers instead of navigating away
                                           _quantityController.clear();
                                           _depositController.clear();
                                           FocusScope.of(context).unfocus();
@@ -452,20 +449,30 @@ class _BuyerListingDetailScreenState extends ConsumerState<BuyerListingDetailScr
 
 class _InfoTile extends StatelessWidget {
   final String label, value;
-  const _InfoTile({required this.label, required this.value});
+  final bool isFullWidth;
+  const _InfoTile({required this.label, required this.value, this.isFullWidth = false});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      width: double.infinity,
+      padding: EdgeInsets.all(isFullWidth ? 16 : 12),
       decoration: glassDecoration(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text(label, style: TextStyle(fontSize: 11, color: Colors.white.withValues(alpha: 0.5))),
+          Text(label, style: TextStyle(fontSize: isFullWidth ? 13 : 11, color: Colors.white.withValues(alpha: 0.5))),
           const SizedBox(height: 4),
-          Text(value, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.white)),
+          Text(
+            value, 
+            style: TextStyle(
+              fontSize: isFullWidth ? 18 : 15, 
+              fontWeight: FontWeight.w700, 
+              color: Colors.white
+            ),
+            softWrap: true,
+          ),
         ],
       ),
     );

@@ -69,14 +69,14 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
     try {
       await ref.read(authServiceProvider).signUp(
-        name: name,
-        email: email,
-        password: password,
-        role: _selectedRole!,
-        mainCity: city,
-        phoneNumber: phone,
-        preferredCity: city,
-      );
+            name: name,
+            email: email,
+            password: password,
+            role: _selectedRole!,
+            mainCity: city,
+            phoneNumber: phone,
+            preferredCity: city,
+          );
 
       await ref.read(authServiceProvider).signIn(email, password);
 
@@ -146,28 +146,32 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               ),
               const SizedBox(height: 12),
 
-              Row(
-                children: [
-                  Expanded(
-                    child: _RoleCard(
-                      icon: Icons.storefront_rounded,
-                      label: 'Продавам',
-                      subtitle: 'Аз съм фермер/продавач',
-                      isSelected: _selectedRole == 'seller',
-                      onTap: () => setState(() => _selectedRole = 'seller'),
+              // IntrinsicHeight makes the Row as tall as its tallest child
+              IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      child: _RoleCard(
+                        icon: Icons.storefront_rounded,
+                        label: 'Продавам',
+                        subtitle: 'Аз съм фермер/продавач',
+                        isSelected: _selectedRole == 'seller',
+                        onTap: () => setState(() => _selectedRole = 'seller'),
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _RoleCard(
-                      icon: Icons.shopping_bag_rounded,
-                      label: 'Купувам',
-                      subtitle: 'Аз съм купувач',
-                      isSelected: _selectedRole == 'buyer',
-                      onTap: () => setState(() => _selectedRole = 'buyer'),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _RoleCard(
+                        icon: Icons.shopping_bag_rounded,
+                        label: 'Купувам',
+                        subtitle: 'Аз съм купувач',
+                        isSelected: _selectedRole == 'buyer',
+                        onTap: () => setState(() => _selectedRole = 'buyer'),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
 
               const SizedBox(height: 28),
@@ -310,7 +314,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   }
 }
 
-/// ✅ THIS WAS MISSING (NOW FIXED)
 class _RoleCard extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -332,7 +335,7 @@ class _RoleCard extends StatelessWidget {
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 250),
-        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 12),
         decoration: glassDecoration().copyWith(
           border: Border.all(
             color: isSelected
@@ -342,16 +345,31 @@ class _RoleCard extends StatelessWidget {
           ),
         ),
         child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon,
-                size: 32,
-                color: isSelected
-                    ? AppTheme.accentGreen
-                    : AppTheme.textTertiary),
+            Icon(
+              icon,
+              size: 32,
+              color: isSelected ? AppTheme.accentGreen : AppTheme.textTertiary,
+            ),
             const SizedBox(height: 12),
-            Text(label),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: isSelected ? AppTheme.accentGreen : AppTheme.textPrimary,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             const SizedBox(height: 4),
-            Text(subtitle, textAlign: TextAlign.center),
+            Text(
+              subtitle,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 12,
+                color: AppTheme.textSecondary,
+              ),
+            ),
           ],
         ),
       ),
