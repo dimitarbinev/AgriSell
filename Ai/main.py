@@ -10,15 +10,17 @@ from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 import os
 import asyncio
-from math import radians, cos, sin, asin, sqrt
 from dotenv import load_dotenv
 import pandas as pd
+from contextlib import asynccontextmanager
+import logging
 
 load_dotenv()
 
 # -------------------------------------------------------
 # Firebase setup
 # -------------------------------------------------------
+# Global instance
 db = None
 firebase_available = False
 
@@ -98,7 +100,7 @@ class PriceRequest(BaseModel):
     product_id: str
     city: str
     season: str
-    seller_id: str
+
 
 class CityModel(BaseModel):
     name: str
@@ -659,6 +661,16 @@ async def recommend_route(req: DbRouteRequest):
     except Exception as e:
         print(f"Error in recommend_route: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+    # Ensure CORS is always added (it was lost in replacement)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+    
 
 if __name__ == "__main__":
     import uvicorn
