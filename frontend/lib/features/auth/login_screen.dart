@@ -213,18 +213,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 24),
-              OutlinedButton.icon(
-                onPressed: _handleGoogleSignIn,
-                icon: const Icon(Icons.g_mobiledata, size: 28),
-                label: const Text('Продължи с Google'),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  side: BorderSide(
-                    color: AppTheme.textTertiary.withValues(alpha: 0.3),
-                  ),
-                ),
-              ),
+              
               const SizedBox(height: 32),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,

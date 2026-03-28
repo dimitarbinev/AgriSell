@@ -377,22 +377,33 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _buildFieldLabel('Сезон'),
+                          _buildFieldLabel('Сезон'),
+
                         DropdownButtonFormField<String>(
-                          initialValue: _selectedSeason,
+                          value: _selectedSeason,
+                          isExpanded: true, // 🔥 IMPORTANT FIX
                           style: const TextStyle(color: Colors.white),
                           decoration: _inputDecoration('Избери'),
                           dropdownColor: Colors.black87,
+                          iconEnabledColor: AppTheme.accentGreen,
                           items: AppConstants.seasons
-                              .map((s) => DropdownMenuItem(value: s, child: Text(s, style: const TextStyle(color: Colors.white))))
+                              .map(
+                                (s) => DropdownMenuItem(
+                                  value: s,
+                                  child: Text(
+                                    s,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(color: Colors.white),
+                                  ),
+                                ),
+                              )
                               .toList(),
                           onChanged: (v) {
                             setState(() {
                               _selectedSeason = v;
-                              // Reset user-edit flag so prefill can update
                               _userEditedPrice = false;
                             });
-                            // Re-fetch price for the selected season
+
                             if (_nameController.text.length > 2) {
                               _fetchPriceSuggestion(_nameController.text, season: v);
                             }

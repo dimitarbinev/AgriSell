@@ -32,7 +32,7 @@ class ListingCard extends StatelessWidget {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Product image
+                  // Product image - фиксиран размер, за да не "играе" интерфейсът
                   Container(
                     width: 72,
                     height: 72,
@@ -55,12 +55,14 @@ class ListingCard extends StatelessWidget {
                         : null,
                   ),
                   const SizedBox(width: 14),
-                  // Info
+                  
+                  // Основна информация - Expanded заема останалото място
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
                             Expanded(
                               child: Text(
@@ -74,31 +76,41 @@ class ListingCard extends StatelessWidget {
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
+                            const SizedBox(width: 8),
+                            // StatusChip е малък, но го пазим да не прелее
                             StatusChip(status: listing.status, small: true),
                           ],
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 6),
+                        
+                        // Секция Продавач
                         if (showSellerInfo && listing.sellerName != null) ...[
-                              Row(
-                                children: [
-                                  Text(
-                                    listing.sellerName!,
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      color: Colors.white.withValues(alpha: 0.7),
-                                    ),
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  listing.sellerName!,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: Colors.white.withValues(alpha: 0.7),
                                   ),
-                                  if (listing.sellerRating != null) ...[
-                                    const SizedBox(width: 8),
-                                    RatingStars(
-                                      rating: listing.sellerRating!,
-                                      size: 12,
-                                    ),
-                                  ],
-                                ],
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
-                              const SizedBox(height: 4),
+                              if (listing.sellerRating != null) ...[
+                                const SizedBox(width: 6),
+                                RatingStars(
+                                  rating: listing.sellerRating!,
+                                  size: 10,
+                                ),
+                              ],
                             ],
+                          ),
+                          const SizedBox(height: 6),
+                        ],
+
+                        // Локация и Дати
                         Row(
                           children: [
                             const Icon(
@@ -107,44 +119,45 @@ class ListingCard extends StatelessWidget {
                               color: AppTheme.accentGreen,
                             ),
                             const SizedBox(width: 3),
-                            Text(
-                              listing.city,
-                              style: const TextStyle(
-                                fontSize: 13,
-                                color: AppTheme.accentGreen,
-                                fontWeight: FontWeight.w600,
+                            Flexible(
+                              child: Text(
+                                listing.city,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: AppTheme.accentGreen,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
-                            const Spacer(),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppTheme.primaryGreen.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(Icons.calendar_today_outlined, 
-                                    size: 10, color: AppTheme.accentGreen.withValues(alpha: 0.8)),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    '${DateFormat('MMM d').format(listing.startDate)} - ${DateFormat('MMM d').format(listing.endDate)}',
+                            const SizedBox(width: 8),
+                            // Датите в малък контейнер с FittedBox за защита
+                            Flexible(
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.primaryGreen.withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    '${DateFormat('dd.MM').format(listing.startDate)} - ${DateFormat('dd.MM').format(listing.endDate)}',
                                     style: const TextStyle(
-                                      fontSize: 11,
+                                      fontSize: 10,
                                       fontWeight: FontWeight.w600,
                                       color: AppTheme.accentGreen,
                                     ),
                                   ),
-                                ],
+                                ),
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 6),
+                        const SizedBox(height: 8),
+                        
+                        // Цена
                         Text(
                           '${listing.pricePerKg.toStringAsFixed(2)} лв/кг',
                           style: const TextStyle(
@@ -159,9 +172,10 @@ class ListingCard extends StatelessWidget {
                 ],
               ),
             ),
-            // Progress bar
+            
+            // Progress bar - подсигурен с Padding
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
               child: QuantityProgressBar(
                 current: listing.requestedQuantity,
                 target: listing.minThreshold,
