@@ -84,17 +84,32 @@ export const listingConfirmation = catch_async(async (req: Request, res: Respons
         return res.status(404).json({ message: "User not found" });
     }
 
+    const productDoc = await db.collection("users").doc(uid).collection('products').doc(productId).get();
+    const productData = productDoc.data();
+
     const userRole = userRef.data()?.role;
     if (userRole !== "seller") {
         return res.status(403).json({ message: "User is not a seller" });
     }
 
-    await db.collection("users").doc(uid).collection('products').doc(productId).collection("listings").add({
+    // 4. Create Listing sub-collection document (Slimmer than Product doc)
+    const listingData = {
         startDate,
         endDate,
         status: Status.active,
-        updatedAt: new Date()
-    });
+        updatedAt: new Date(),
+        // Denormalized Product Data for easier frontend joins (reactive)
+        productName: productData?.productName || productData?.name || '',
+        productCategory: productData?.category || '',
+        city: productData?.origin || productData?.mainCity || '',
+        pricePerKg: Number(productData?.pricePerKg || 0),
+        availableQuantity: Number(productData?.maxCapacity || 0),
+        minThreshold: Number(productData?.minThreshold || 0),
+        requestedQuantity: 0,
+        depositsTotal: 0
+    };
+
+    await db.collection("users").doc(uid).collection('products').doc(productId).collection("listings").add(listingData);
 
     // CRITICAL: Trigger snapshot listener on parent collection
     await db.collection("users").doc(uid).collection('products').doc(productId).update({
