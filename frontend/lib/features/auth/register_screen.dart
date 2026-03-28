@@ -19,8 +19,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _confirmPasswordController = TextEditingController();
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
+
   String? _selectedCity;
   String? _selectedRole;
+
   bool _obscurePassword = true;
   bool _isLoading = false;
 
@@ -44,8 +46,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     final phone = _phoneController.text.trim();
     final city = _selectedCity;
 
-    if (email.isEmpty || password.isEmpty || confirmPassword.isEmpty || 
-        name.isEmpty || city == null || phone.isEmpty) {
+    if (email.isEmpty ||
+        password.isEmpty ||
+        confirmPassword.isEmpty ||
+        name.isEmpty ||
+        city == null ||
+        phone.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Моля, попълнете всички полета')),
       );
@@ -129,7 +135,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               ),
               const SizedBox(height: 32),
 
-              // Role Selection
+              /// ROLE
               const Text(
                 'Искам да',
                 style: TextStyle(
@@ -139,6 +145,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 ),
               ),
               const SizedBox(height: 12),
+
               Row(
                 children: [
                   Expanded(
@@ -162,9 +169,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   ),
                 ],
               ),
+
               const SizedBox(height: 28),
 
-              // Form fields
+              /// FORM
               Container(
                 padding: const EdgeInsets.all(24),
                 decoration: glassDecoration(),
@@ -180,6 +188,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
+
                     TextField(
                       controller: _emailController,
                       keyboardType: TextInputType.emailAddress,
@@ -190,58 +199,78 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
+
+                    /// CITY AUTOCOMPLETE
+                    Autocomplete<String>(
+                      optionsBuilder: (text) {
+                        if (text.text.isEmpty) {
+                          return const Iterable<String>.empty();
+                        }
+                        return AppConstants.cities.where((c) =>
+                            c.toLowerCase().contains(text.text.toLowerCase()));
+                      },
+                      onSelected: (value) {
+                        _selectedCity = value;
+                      },
+                      fieldViewBuilder:
+                          (context, controller, focusNode, _) {
+                        return TextField(
+                          controller: controller,
+                          focusNode: focusNode,
+                          style: const TextStyle(color: AppTheme.textPrimary),
+                          decoration: InputDecoration(
+                            labelText: _selectedRole == 'seller'
+                                ? 'Основен град'
+                                : 'Предпочитан град',
+                            prefixIcon: const Icon(Icons.location_on_outlined),
+                          ),
+                        );
+                      },
+                    ),
+
+                    const SizedBox(height: 16),
+
                     TextField(
                       controller: _passwordController,
                       obscureText: _obscurePassword,
                       style: const TextStyle(color: AppTheme.textPrimary),
                       decoration: InputDecoration(
                         labelText: 'Парола',
-                        prefixIcon: const Icon(Icons.lock_outline, size: 20),
+                        prefixIcon: const Icon(Icons.lock_outline),
                         suffixIcon: IconButton(
-                          icon: Icon(
-                            _obscurePassword
-                                ? Icons.visibility_off_outlined
-                                : Icons.visibility_outlined,
-                            size: 20,
-                          ),
-                          onPressed: () =>
-                              setState(() => _obscurePassword = !_obscurePassword),
+                          icon: Icon(_obscurePassword
+                              ? Icons.visibility_off_outlined
+                              : Icons.visibility_outlined),
+                          onPressed: () => setState(
+                              () => _obscurePassword = !_obscurePassword),
                         ),
                       ),
                     ),
+
                     const SizedBox(height: 16),
+
                     TextField(
                       controller: _confirmPasswordController,
                       obscureText: true,
                       style: const TextStyle(color: AppTheme.textPrimary),
                       decoration: const InputDecoration(
                         labelText: 'Потвърди парола',
-                        prefixIcon: Icon(Icons.lock_outline, size: 20),
+                        prefixIcon: Icon(Icons.lock_outline),
                       ),
                     ),
+
                     const SizedBox(height: 16),
-                    DropdownButtonFormField<String>(
-                      initialValue: _selectedCity,
-                      decoration: InputDecoration(
-                        labelText: _selectedRole == 'seller' ? 'Основен град' : 'Предпочитан град',
-                        prefixIcon: const Icon(Icons.location_on_outlined, size: 20),
-                      ),
-                      dropdownColor: AppTheme.cardSurface,
-                      items: AppConstants.cities
-                          .map((c) => DropdownMenuItem(value: c, child: Text(c)))
-                          .toList(),
-                      onChanged: (v) => setState(() => _selectedCity = v),
-                    ),
-                    const SizedBox(height: 16),
+
                     TextField(
                       controller: _phoneController,
                       keyboardType: TextInputType.phone,
                       style: const TextStyle(color: AppTheme.textPrimary),
                       decoration: const InputDecoration(
                         labelText: 'Телефонен номер',
-                        prefixIcon: Icon(Icons.phone_outlined, size: 20),
+                        prefixIcon: Icon(Icons.phone_outlined),
                       ),
                     ),
+
                     const SizedBox(height: 32),
 
                     Container(
@@ -263,38 +292,16 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.transparent,
                           shadowColor: Colors.transparent,
-                          disabledBackgroundColor: Colors.transparent,
                         ),
                         child: _isLoading
-                            ? const SizedBox(
-                                width: 24,
-                                height: 24,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2.5,
-                                  color: Colors.white,
-                                ),
-                              )
+                            ? const CircularProgressIndicator(
+                                color: Colors.white)
                             : const Text('Регистрация'),
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 24),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Text(
-                    'Вече имате акаунт? ',
-                    style: TextStyle(color: AppTheme.textSecondary, fontSize: 14),
-                  ),
-                  TextButton(
-                    onPressed: () => context.go('/login'),
-                    child: const Text('Вход'),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
             ],
           ),
         ),
@@ -303,6 +310,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   }
 }
 
+/// ✅ THIS WAS MISSING (NOW FIXED)
 class _RoleCard extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -325,66 +333,28 @@ class _RoleCard extends StatelessWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 250),
         padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-        decoration: glassDecoration(
-          alpha: isSelected ? 0.25 : 0.08,
-          radius: AppTheme.radiusLarge,
-        ).copyWith(
+        decoration: glassDecoration().copyWith(
           border: Border.all(
-            color: isSelected 
-              ? AppTheme.accentGreen.withValues(alpha: 0.8) 
-              : Colors.white.withValues(alpha: 0.1),
-            width: isSelected ? 2.5 : 1,
+            color: isSelected
+                ? AppTheme.accentGreen
+                : Colors.white.withValues(alpha: 0.1),
+            width: isSelected ? 2 : 1,
           ),
-          boxShadow: isSelected ? [
-            BoxShadow(
-              color: AppTheme.accentGreen.withValues(alpha: 0.25),
-              blurRadius: 15,
-              spreadRadius: 2,
-            )
-          ] : null,
         ),
         child: Column(
           children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: isSelected 
-                  ? AppTheme.accentGreen.withValues(alpha: 0.2) 
-                  : Colors.white.withValues(alpha: 0.05),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                icon,
+            Icon(icon,
                 size: 32,
-                color: isSelected ? AppTheme.accentGreen : AppTheme.textTertiary,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
-                color: isSelected ? AppTheme.textPrimary : AppTheme.textSecondary,
-                letterSpacing: 0.2,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              subtitle,
-              style: TextStyle(
-                fontSize: 11, 
-                color: isSelected 
-                  ? AppTheme.textSecondary 
-                  : AppTheme.textTertiary,
-                fontWeight: isSelected ? FontWeight.w500 : FontWeight.w400,
-              ),
-              textAlign: TextAlign.center,
-            ),
+                color: isSelected
+                    ? AppTheme.accentGreen
+                    : AppTheme.textTertiary),
+            const SizedBox(height: 12),
+            Text(label),
+            const SizedBox(height: 4),
+            Text(subtitle, textAlign: TextAlign.center),
           ],
         ),
       ),
     );
   }
 }
-

@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -6,12 +7,13 @@ import '../../shared/models/models.dart';
 import '../../shared/providers/providers.dart';
 import '../../shared/widgets/nature_scaffold.dart';
 
-
 class NotificationsScreen extends ConsumerWidget {
   const NotificationsScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final user = ref.watch(authStateProvider).value;
+
     return NatureScaffold(
       appBar: AppBar(
         leading: IconButton(
@@ -27,94 +29,200 @@ class NotificationsScreen extends ConsumerWidget {
         ),
         title: const Text('Известия', style: TextStyle(color: Colors.white)),
         actions: [
-          TextButton(
-            onPressed: () {/* TODO: mark all read */},
-            child: const Text('Маркирай всички', style: TextStyle(color: AppTheme.accentGreen)),
-          ),
+          if (user != null)
+            TextButton(
+              onPressed: () => _markAllRead(context, ref, user.uid),
+              child: const Text('Маркирай всички', style: TextStyle(color: AppTheme.accentGreen)),
+            ),
         ],
       ),
-      body: ListView.builder(
-        padding: const EdgeInsets.all(20),
-        itemCount: _notifications.length,
-        itemBuilder: (ctx, i) {
-          final n = _notifications[i];
-          return Container(
-            margin: const EdgeInsets.only(bottom: 10),
-            padding: const EdgeInsets.all(16),
-            decoration: glassDecoration().copyWith(
-              border: n.read
-                  ? null
-                  : Border.all(color: AppTheme.primaryGreen.withValues(alpha: 0.3), width: 1),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: 40, height: 40,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: _getNotifColor(n.type).withValues(alpha: 0.15),
+      body: user == null
+          ? const Center(
+              child: Text('Влезте, за да виждате известията си.', style: TextStyle(color: Colors.white70)),
+            )
+          : ref.watch(notificationsProvider(user.uid)).when(
+                data: (list) {
+                  if (list.isEmpty) {
+                    return Center(
+                      child: Text(
+                        'Няма известия.\nЩе се показват тук при резервации и промени по поръчки.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.white.withValues(alpha: 0.6), height: 1.4),
+                      ),
+                    );
+                  }
+                  return ListView.builder(
+                    padding: const EdgeInsets.all(20),
+                    itemCount: list.length,
+                    itemBuilder: (ctx, i) {
+                      final n = list[i];
+                      return Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
+                          onTap: () => _tapNotification(context, ref, user.uid, n),
+                          child: Container(
+                            margin: const EdgeInsets.only(bottom: 10),
+                            padding: const EdgeInsets.all(16),
+                            decoration: glassDecoration().copyWith(
+                              border: n.read
+                                  ? null
+                                  : Border.all(
+                                      color: AppTheme.primaryGreen.withValues(alpha: 0.3),
+                                      width: 1,
+                                    ),
+                            ),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Container(
+                                  width: 40,
+                                  height: 40,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: notifColor(n.type).withValues(alpha: 0.15),
+                                  ),
+                                  child: Icon(notifIcon(n.type), size: 20, color: notifColor(n.type)),
+                                ),
+                                const SizedBox(width: 14),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        n.title,
+                                        style: TextStyle(
+                                          fontWeight: n.read ? FontWeight.w500 : FontWeight.w700,
+                                          color: AppTheme.textPrimary,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        n.body,
+                                        style: const TextStyle(
+                                          fontSize: 13,
+                                          color: AppTheme.textSecondary,
+                                          height: 1.3,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 6),
+                                      Text(
+                                        timeAgo(n.createdAt),
+                                        style: const TextStyle(fontSize: 11, color: AppTheme.textTertiary),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                if (!n.read)
+                                  Container(
+                                    width: 8,
+                                    height: 8,
+                                    decoration: const BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: AppTheme.accentGreen,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  );
+                },
+                loading: () => const Center(child: CircularProgressIndicator(color: AppTheme.accentGreen)),
+                error: (e, _) => Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Text(
+                      'Грешка при зареждане: $e',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: AppTheme.statusCancelled),
+                    ),
                   ),
-                  child: Icon(_getNotifIcon(n.type), size: 20, color: _getNotifColor(n.type)),
                 ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(n.title, style: TextStyle(
-                        fontWeight: n.read ? FontWeight.w500 : FontWeight.w700,
-                        color: AppTheme.textPrimary,
-                      )),
-                      const SizedBox(height: 4),
-                      Text(n.body, style: const TextStyle(fontSize: 13, color: AppTheme.textSecondary, height: 1.3)),
-                      const SizedBox(height: 6),
-                      Text(_timeAgo(n.createdAt), style: const TextStyle(fontSize: 11, color: AppTheme.textTertiary)),
-                    ],
-                  ),
-                ),
-                if (!n.read)
-                  Container(
-                    width: 8, height: 8,
-                    decoration: const BoxDecoration(shape: BoxShape.circle, color: AppTheme.accentGreen),
-                  ),
-              ],
-            ),
-          );
-        },
-      ),
+              ),
     );
   }
 
-  IconData _getNotifIcon(String type) {
-    switch (type) {
-      case 'reservation': return Icons.receipt_long;
-      case 'go': return Icons.check_circle;
-      case 'cancel': return Icons.cancel;
-      default: return Icons.notifications;
+  Future<void> _markAllRead(BuildContext context, WidgetRef ref, String userId) async {
+    final fs = ref.read(firestoreProvider);
+    try {
+      final snap = await fs.collection('notifications').where('userId', isEqualTo: userId).get();
+      WriteBatch batch = fs.batch();
+      var n = 0;
+      for (final d in snap.docs) {
+        final read = d.data()['read'] as bool? ?? false;
+        if (read) continue;
+        batch.update(d.reference, {'read': true});
+        n++;
+        if (n >= 450) {
+          await batch.commit();
+          batch = fs.batch();
+          n = 0;
+        }
+      }
+      if (n > 0) await batch.commit();
+      ref.invalidate(notificationsProvider(userId));
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Всички известия са маркирани като прочетени.')),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Грешка: $e')),
+        );
+      }
     }
   }
 
-  Color _getNotifColor(String type) {
-    switch (type) {
-      case 'reservation': return AppTheme.statusActive;
-      case 'go': return AppTheme.statusGoConfirmed;
-      case 'cancel': return AppTheme.statusCancelled;
-      default: return AppTheme.accentGreen;
+  Future<void> _tapNotification(
+    BuildContext context,
+    WidgetRef ref,
+    String userId,
+    AppNotification n,
+  ) async {
+    if (!n.read) {
+      try {
+        await ref.read(firestoreProvider).collection('notifications').doc(n.id).update({'read': true});
+        ref.invalidate(notificationsProvider(userId));
+      } catch (_) {/* ignore */}
     }
-  }
-
-  String _timeAgo(DateTime dt) {
-    final diff = DateTime.now().difference(dt);
-    if (diff.inMinutes < 60) return 'Преди ${diff.inMinutes} мин.';
-    if (diff.inHours < 24) return 'Преди ${diff.inHours} ч.';
-    return 'Преди ${diff.inDays} дни';
   }
 }
 
-final _notifications = [
-  AppNotification(id: '1', userId: 'u1', title: 'New Reservation', body: 'Maria Ivanova reserved 10 kg of Fresh Tomatoes for your Sofia listing.', type: 'reservation', read: false, createdAt: DateTime.now().subtract(const Duration(minutes: 15))),
-  AppNotification(id: '2', userId: 'u1', title: 'GO Confirmed!', body: 'Seller Ivan Petrov confirmed GO for Fresh Tomatoes listing in Sofia. See you there!', type: 'go', read: false, createdAt: DateTime.now().subtract(const Duration(hours: 2))),
-  AppNotification(id: '3', userId: 'u1', title: 'Listing Cancelled', body: 'Unfortunately, the Organic Apples listing in Ruse has been cancelled due to low demand.', type: 'cancel', read: true, createdAt: DateTime.now().subtract(const Duration(days: 1))),
-  AppNotification(id: '4', userId: 'u1', title: 'New Reservation', body: 'Georgi Dimitrov reserved 25 kg for your Plovdiv listing.', type: 'reservation', read: true, createdAt: DateTime.now().subtract(const Duration(days: 2))),
-];
+IconData notifIcon(String type) {
+  switch (type) {
+    case 'reservation':
+      return Icons.receipt_long;
+    case 'go':
+      return Icons.check_circle;
+    case 'cancel':
+      return Icons.cancel;
+    default:
+      return Icons.notifications;
+  }
+}
+
+Color notifColor(String type) {
+  switch (type) {
+    case 'reservation':
+      return AppTheme.statusActive;
+    case 'go':
+      return AppTheme.statusGoConfirmed;
+    case 'cancel':
+      return AppTheme.statusCancelled;
+    default:
+      return AppTheme.accentGreen;
+  }
+}
+
+String timeAgo(DateTime dt) {
+  final diff = DateTime.now().difference(dt);
+  if (diff.inMinutes < 1) return 'Току-що';
+  if (diff.inMinutes < 60) return 'Преди ${diff.inMinutes} мин.';
+  if (diff.inHours < 24) return 'Преди ${diff.inHours} ч.';
+  return 'Преди ${diff.inDays} дни';
+}

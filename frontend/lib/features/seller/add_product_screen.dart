@@ -154,6 +154,8 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
             season: _selectedSeason!,
           );
 
+      invalidateProductListingCaches(ref);
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Продуктът е добавен успешно')),

@@ -386,8 +386,10 @@ class _BuyerListingDetailScreenState extends ConsumerState<BuyerListingDetailScr
                                           deposit: deposit,
                                         );
                                         
-                                        // Force refresh the listings to show updated progress
-                                        ref.invalidate(activeListingsProvider);
+                                        invalidateProductListingCaches(
+                                          ref,
+                                          listingSellerId: listing.sellerId,
+                                        );
 
                                         if (mounted) {
                                           ScaffoldMessenger.of(context).showSnackBar(

@@ -12,11 +12,14 @@ class CreateListingScreen extends ConsumerStatefulWidget {
   const CreateListingScreen({super.key});
 
   @override
-  ConsumerState<CreateListingScreen> createState() => _CreateListingScreenState();
+  ConsumerState<CreateListingScreen> createState() =>
+      _CreateListingScreenState();
 }
 
 class _CreateListingScreenState extends ConsumerState<CreateListingScreen> {
   final _priceController = TextEditingController();
+  final _cityController = TextEditingController();
+
   Product? _selectedProduct;
   String? _selectedCity;
   DateTime? _startDate;
@@ -26,14 +29,16 @@ class _CreateListingScreenState extends ConsumerState<CreateListingScreen> {
   @override
   void dispose() {
     _priceController.dispose();
+    _cityController.dispose();
     super.dispose();
   }
 
   void _pickDate(bool isStart) async {
     final now = DateTime.now();
-    final initialDate = isStart 
+    final initialDate = isStart
         ? now.add(const Duration(days: 1))
-        : (_startDate?.add(const Duration(days: 1)) ?? now.add(const Duration(days: 2)));
+        : (_startDate?.add(const Duration(days: 1)) ??
+            now.add(const Duration(days: 2)));
 
     final date = await showDatePicker(
       context: context,
@@ -67,8 +72,10 @@ class _CreateListingScreenState extends ConsumerState<CreateListingScreen> {
   }
 
   Future<void> _handleCreate() async {
+    final city = _cityController.text.trim();
+
     if (_selectedProduct == null ||
-        _selectedCity == null ||
+        city.isEmpty ||
         _startDate == null ||
         _endDate == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -82,10 +89,12 @@ class _CreateListingScreenState extends ConsumerState<CreateListingScreen> {
     try {
       await ref.read(productServiceProvider).confirmListing(
             productId: _selectedProduct!.id,
-            city: _selectedCity!,
+            city: city,
             startDate: _startDate!,
             endDate: _endDate!,
           );
+
+      invalidateProductListingCaches(ref);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -96,7 +105,7 @@ class _CreateListingScreenState extends ConsumerState<CreateListingScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Неуспешно създаване: ${e.toString()}')),
+          SnackBar(content: Text('Неуспешно създаване: $e')),
         );
       }
     } finally {
@@ -129,47 +138,84 @@ class _CreateListingScreenState extends ConsumerState<CreateListingScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               _buildFieldLabel('Избери продукт'),
+
               productsAsync.when(
                 data: (products) => DropdownButtonFormField<Product>(
-                  initialValue: _selectedProduct,
+                  value: _selectedProduct,
                   style: const TextStyle(color: Colors.white),
                   decoration: _inputDecoration('Продукт').copyWith(
-                    prefixIcon: const Icon(Icons.eco, size: 20, color: AppTheme.accentGreen),
+                    prefixIcon: const Icon(Icons.eco,
+                        size: 20, color: AppTheme.accentGreen),
                   ),
                   dropdownColor: Colors.black87,
                   items: products
-                      .map((p) => DropdownMenuItem(value: p, child: Text(p.name, style: const TextStyle(color: Colors.white))))
+                      .map(
+                        (p) => DropdownMenuItem(
+                          value: p,
+                          child: Text(p.name,
+                              style:
+                                  const TextStyle(color: Colors.white)),
+                        ),
+                      )
                       .toList(),
                   onChanged: (v) {
                     setState(() {
                       _selectedProduct = v;
                       if (v != null) {
-                        _priceController.text = v.pricePerKg.toStringAsFixed(2);
+                        _priceController.text =
+                            v.pricePerKg.toStringAsFixed(2);
                       }
                     });
                   },
                 ),
-                loading: () => const Center(child: CircularProgressIndicator()),
-                error: (err, _) => Text('Грешка при зареждане: $err',
-                    style: const TextStyle(color: Colors.red)),
-              ),
-              const SizedBox(height: 18),
-
-              _buildFieldLabel('Град'),
-              DropdownButtonFormField<String>(
-                initialValue: _selectedCity,
-                style: const TextStyle(color: Colors.white),
-                decoration: _inputDecoration('Избери град').copyWith(
-                  prefixIcon: const Icon(Icons.location_on_outlined, size: 20, color: AppTheme.accentGreen),
+                loading: () =>
+                    const Center(child: CircularProgressIndicator()),
+                error: (err, _) => Text(
+                  'Грешка при зареждане: $err',
+                  style: const TextStyle(color: Colors.red),
                 ),
-                dropdownColor: Colors.black87,
-                items: AppConstants.cities
-                    .map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(color: Colors.white))))
-                    .toList(),
-                onChanged: (v) => setState(() => _selectedCity = v),
               ),
+
               const SizedBox(height: 18),
 
+              /// 🔥 CITY AUTOCOMPLETE
+              _buildFieldLabel('Град'),
+
+              Autocomplete<String>(
+                optionsBuilder: (text) {
+                  if (text.text.isEmpty) {
+                    return const Iterable<String>.empty();
+                  }
+                  return AppConstants.cities.where(
+                    (c) => c.toLowerCase().contains(
+                          text.text.toLowerCase(),
+                        ),
+                  );
+                },
+                onSelected: (value) {
+                  _cityController.text = value;
+                  _selectedCity = value;
+                },
+                fieldViewBuilder: (context, controller, focusNode, _) {
+                  controller.text = _cityController.text;
+
+                  return TextField(
+                    controller: controller,
+                    focusNode: focusNode,
+                    onChanged: (val) {
+                      _cityController.text = val;
+                      _selectedCity = val;
+                    },
+                    style: const TextStyle(color: Colors.white),
+                    decoration:
+                        _inputDecoration('Започни да пишеш град...'),
+                  );
+                },
+              ),
+
+              const SizedBox(height: 18),
+
+              /// 🔥 FIXED DATE SECTION (NO OVERFLOW)
               Row(
                 children: [
                   Expanded(
@@ -179,32 +225,7 @@ class _CreateListingScreenState extends ConsumerState<CreateListingScreen> {
                         _buildFieldLabel('Начална дата'),
                         GestureDetector(
                           onTap: () => _pickDate(true),
-                          child: Container(
-                            height: 48,
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.05),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(Icons.calendar_today, size: 18, color: AppTheme.accentGreen),
-                                const SizedBox(width: 12),
-                                Text(
-                                  _startDate != null
-                                      ? DateFormat('MMM d, y').format(_startDate!)
-                                      : 'Начало',
-                                  style: TextStyle(
-                                    color: _startDate != null
-                                        ? Colors.white
-                                        : Colors.white.withValues(alpha: 0.3),
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
+                          child: _dateBox(_startDate, 'Начало'),
                         ),
                       ],
                     ),
@@ -217,76 +238,75 @@ class _CreateListingScreenState extends ConsumerState<CreateListingScreen> {
                         _buildFieldLabel('Крайна дата'),
                         GestureDetector(
                           onTap: () => _pickDate(false),
-                          child: Container(
-                            height: 48,
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.05),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(Icons.calendar_today, size: 18, color: AppTheme.accentGreen),
-                                const SizedBox(width: 12),
-                                Text(
-                                  _endDate != null
-                                      ? DateFormat('MMM d, y').format(_endDate!)
-                                      : 'Край',
-                                  style: TextStyle(
-                                    color: _endDate != null
-                                        ? Colors.white
-                                        : Colors.white.withValues(alpha: 0.3),
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
+                          child: _dateBox(_endDate, 'Край'),
                         ),
                       ],
                     ),
                   ),
                 ],
               ),
+
               const SizedBox(height: 32),
 
               Container(
                 height: 52,
                 decoration: BoxDecoration(
                   gradient: AppTheme.primaryGradient,
-                  borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppTheme.primaryGreen.withValues(alpha: 0.3),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
+                  borderRadius:
+                      BorderRadius.circular(AppTheme.radiusMedium),
                 ),
                 child: ElevatedButton(
                   onPressed: _isLoading ? null : _handleCreate,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.transparent,
                     shadowColor: Colors.transparent,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppTheme.radiusMedium)),
                   ),
                   child: _isLoading
-                      ? const SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2.5,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Text('Създай обява',
-                          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+                      ? const CircularProgressIndicator(
+                          color: Colors.white)
+                      : const Text('Създай обява'),
                 ),
               ),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  /// 🔥 FIXED DATE BOX (NO OVERFLOW)
+  Widget _dateBox(DateTime? date, String placeholder) {
+    return Container(
+      height: 52,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(12),
+        border:
+            Border.all(color: Colors.white.withValues(alpha: 0.1)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.calendar_today,
+              size: 18, color: AppTheme.accentGreen),
+          const SizedBox(width: 8),
+
+          Expanded(
+            child: Text(
+              date != null
+                  ? DateFormat('MMM d, y').format(date)
+                  : placeholder,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: date != null
+                    ? Colors.white
+                    : Colors.white.withValues(alpha: 0.3),
+                fontSize: 13,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -308,21 +328,16 @@ class _CreateListingScreenState extends ConsumerState<CreateListingScreen> {
   InputDecoration _inputDecoration(String hint) {
     return InputDecoration(
       hintText: hint,
-      hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.3), fontSize: 14),
+      hintStyle: TextStyle(
+        color: Colors.white.withValues(alpha: 0.3),
+        fontSize: 14,
+      ),
       filled: true,
       fillColor: Colors.white.withValues(alpha: 0.05),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      contentPadding:
+          const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: AppTheme.accentGreen, width: 1),
       ),
     );
   }

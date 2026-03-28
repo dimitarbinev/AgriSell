@@ -43,6 +43,8 @@ class Seller {
     );
   }
 
+  int? get totalProducts => null;
+
   Map<String, dynamic> toJson() => {
     'name': name,
     'mainCity': mainCity,

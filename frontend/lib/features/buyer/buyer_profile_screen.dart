@@ -27,10 +27,10 @@ class BuyerProfileScreen extends ConsumerWidget {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: AppTheme.primaryGradient,
-                border: Border.all(color: Colors.white.withOpacity(0.2), width: 3),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.2), width: 3),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
+                    color: Colors.black.withValues(alpha: 0.1),
                     blurRadius: 10,
                     spreadRadius: 2,
                   )
@@ -64,7 +64,7 @@ class BuyerProfileScreen extends ConsumerWidget {
                         buyer?.preferredCity ?? 'Неизвестен',
                         style: TextStyle(
                           fontSize: 14,
-                          color: Colors.white.withOpacity(0.8),
+                          color: Colors.white.withValues(alpha: 0.8),
                         ),
                       ),
                     ],
@@ -76,17 +76,37 @@ class BuyerProfileScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 28),
 
-            // Stats with glass decoration
+            // Stats (резервации / отзиви от базата)
             Row(
               children: [
-                Expanded(child: _StatCard(label: 'Поръчки', value: '12', icon: Icons.shopping_bag_outlined)),
+                Expanded(
+                  child: ref.watch(myReservationsProvider).when(
+                    data: (r) => _StatCard(
+                      label: 'Поръчки',
+                      value: r.length.toString(),
+                      icon: Icons.shopping_bag_outlined,
+                    ),
+                    loading: () => _StatCard(label: 'Поръчки', value: '…', icon: Icons.shopping_bag_outlined),
+                    error: (_, _) => _StatCard(label: 'Поръчки', value: '0', icon: Icons.shopping_bag_outlined),
+                  ),
+                ),
                 const SizedBox(width: 12),
-                Expanded(child: _StatCard(label: 'Отзиви', value: '8', icon: Icons.rate_review_outlined)),
+                Expanded(
+                  child: ref.watch(buyerWrittenReviewsProvider).when(
+                    data: (reviews) => _StatCard(
+                      label: 'Отзиви',
+                      value: reviews.length.toString(),
+                      icon: Icons.rate_review_outlined,
+                    ),
+                    loading: () => _StatCard(label: 'Отзиви', value: '…', icon: Icons.rate_review_outlined),
+                    error: (_, _) => _StatCard(label: 'Отзиви', value: '0', icon: Icons.rate_review_outlined),
+                  ),
+                ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: ref.watch(savedSellersProvider).when(
                     data: (ids) => _StatCard(label: 'Запазени', value: ids.length.toString(), icon: Icons.favorite_outline),
-                    loading: () => _StatCard(label: 'Запазени', value: '...', icon: Icons.favorite_outline),
+                    loading: () => _StatCard(label: 'Запазени', value: '…', icon: Icons.favorite_outline),
                     error: (_, _) => _StatCard(label: 'Запазени', value: '0', icon: Icons.favorite_outline),
                   ),
                 ),
@@ -94,42 +114,37 @@ class BuyerProfileScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 28),
 
-            // Menu items with glass effect
-            Container(
-              decoration: glassDecoration(radius: AppTheme.radiusLarge),
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Column(
-                children: [
-                  _MenuItem(icon: Icons.favorite_outline, label: 'Запазени продавачи', onTap: () => context.push('/buyer/saved-sellers')),
-                  const Divider(height: 1, indent: 56, endIndent: 20, color: Colors.white10),
-                  _MenuItem(icon: Icons.settings_outlined, label: 'Настройки', onTap: () => context.push('/seller/settings')),
-                  const Divider(height: 1, indent: 56, endIndent: 20, color: Colors.white10),
-                  _MenuItem(
-                    icon: Icons.storefront_outlined,
-                    label: 'Превключи към продавач',
-                    onTap: () async {
-                      try {
-                        await ref.read(authServiceProvider).switchRole('seller');
-                        if (context.mounted) {
-                          context.go('/seller/dashboard');
-                        }
-                      } catch (e) {
-                        debugPrint('Error switching role: $e');
-                      }
-                    },
-                  ),
-                  const Divider(height: 1, indent: 56, endIndent: 20, color: Colors.white10),
-                  _MenuItem(
-                    icon: Icons.logout,
-                    label: 'Изход',
-                    isDanger: true,
-                    onTap: () async {
-                      await ref.read(authServiceProvider).signOut();
-                      if (context.mounted) context.go('/login');
-                    },
-                  ),
-                ],
-              ),
+            // Отделни плочки (като втората референция)
+            _ProfileMenuTile(
+              icon: Icons.favorite_outline,
+              label: 'Запазени продавачи',
+              onTap: () => context.push('/buyer/saved-sellers'),
+            ),
+            _ProfileMenuTile(
+              icon: Icons.settings_outlined,
+              label: 'Настройки',
+              onTap: () => context.push('/seller/settings'),
+            ),
+            _ProfileMenuTile(
+              icon: Icons.storefront_outlined,
+              label: 'Превключи към продавач',
+              onTap: () async {
+                try {
+                  await ref.read(authServiceProvider).switchRole('seller');
+                  if (context.mounted) context.go('/seller/dashboard');
+                } catch (e) {
+                  debugPrint('Error switching role: $e');
+                }
+              },
+            ),
+            _ProfileMenuTile(
+              icon: Icons.logout,
+              label: 'Изход',
+              isDanger: true,
+              onTap: () async {
+                await ref.read(authServiceProvider).signOut();
+                if (context.mounted) context.go('/login');
+              },
             ),
             const SizedBox(height: 40),
           ],
@@ -167,7 +182,7 @@ class _StatCard extends StatelessWidget {
             label,
             style: TextStyle(
               fontSize: 12,
-              color: Colors.white.withOpacity(0.6),
+              color: Colors.white.withValues(alpha: 0.6),
             ),
           ),
         ],
@@ -176,13 +191,13 @@ class _StatCard extends StatelessWidget {
   }
 }
 
-class _MenuItem extends StatelessWidget {
+class _ProfileMenuTile extends StatelessWidget {
   final IconData icon;
   final String label;
   final VoidCallback onTap;
   final bool isDanger;
 
-  const _MenuItem({
+  const _ProfileMenuTile({
     required this.icon,
     required this.label,
     required this.onTap,
@@ -191,22 +206,48 @@ class _MenuItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: glassDecoration(),
-        child: Row(
-          children: [
-            Icon(icon, size: 22, color: isDanger ? AppTheme.statusCancelled : AppTheme.accentGreen),
-            const SizedBox(width: 14),
-            Expanded(child: Text(label, style: TextStyle(
-              fontSize: 15, fontWeight: FontWeight.w500,
-              color: isDanger ? AppTheme.statusCancelled : AppTheme.textPrimary,
-            ))),
-            const Icon(Icons.chevron_right, size: 20, color: Colors.white24),
-          ],
+    final accent = isDanger ? AppTheme.statusCancelled : AppTheme.accentGreen;
+    final textColor = isDanger ? AppTheme.statusCancelled : Colors.white;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(AppTheme.radiusXLarge),
+          onTap: onTap,
+          child: Ink(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(AppTheme.radiusXLarge),
+              color: Colors.black.withValues(alpha: 0.35),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.25),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Icon(icon, size: 22, color: accent),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: textColor,
+                    ),
+                  ),
+                ),
+                Icon(Icons.chevron_right, size: 22, color: Colors.white.withValues(alpha: 0.35)),
+              ],
+            ),
+          ),
         ),
       ),
     );

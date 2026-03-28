@@ -308,10 +308,8 @@ class SellerListingDetailScreen extends ConsumerWidget {
                                       try {
                                         await ref.read(productServiceProvider).cancelReservation(r.id);
 
-                                        // Refresh all dependent UI immediately (seller + buyer + listings)
+                                        invalidateProductListingCaches(ref);
                                         ref.invalidate(listingReservationsProvider(listingId));
-                                        ref.invalidate(sellerListingsProvider(user.uid));
-                                        ref.invalidate(activeListingsProvider);
                                         ref.invalidate(myReservationsProvider);
 
                                         if (context.mounted) {
@@ -353,8 +351,7 @@ class SellerListingDetailScreen extends ConsumerWidget {
                         listingId: listing.id,
                         status: 2, // Confirmed GO!
                       );
-                      // Refresh listings
-                      ref.invalidate(sellerListingsProvider(user.uid));
+                      invalidateProductListingCaches(ref);
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(content: Text('Обявата е потвърдена! Старт!')),
@@ -375,8 +372,7 @@ class SellerListingDetailScreen extends ConsumerWidget {
                         listingId: listing.id,
                         status: 3, // Cancelled
                       );
-                      // Refresh listings
-                      ref.invalidate(sellerListingsProvider(user.uid));
+                      invalidateProductListingCaches(ref);
                       if (context.mounted) {
                         context.go('/seller/dashboard');
                         ScaffoldMessenger.of(context).showSnackBar(

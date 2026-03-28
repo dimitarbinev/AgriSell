@@ -160,7 +160,12 @@ class BuyerReservationDetailScreen extends ConsumerWidget {
                     width: double.infinity,
                     height: 54,
                     child: ElevatedButton(
-                      onPressed: () => _showCancelDialog(context, ref, reservation.id),
+                      onPressed: () => _showCancelDialog(
+                            context,
+                            ref,
+                            reservation.id,
+                            reservation.sellerId ?? '',
+                          ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.red.withValues(alpha: 0.1),
                         foregroundColor: Colors.redAccent,
@@ -184,7 +189,12 @@ class BuyerReservationDetailScreen extends ConsumerWidget {
     );
   }
 
-  void _showCancelDialog(BuildContext context, WidgetRef ref, String reservationId) {
+  void _showCancelDialog(
+    BuildContext context,
+    WidgetRef ref,
+    String reservationId,
+    String sellerId,
+  ) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -205,9 +215,8 @@ class BuyerReservationDetailScreen extends ConsumerWidget {
               try {
                 await ref.read(productServiceProvider).cancelReservation(reservationId);
 
-                // Refresh all affected screens immediately
+                invalidateProductListingCaches(ref, listingSellerId: sellerId);
                 ref.invalidate(myReservationsProvider);
-                ref.invalidate(activeListingsProvider);
                 if (context.mounted) {
                   context.go('/buyer/reservations');
                   ScaffoldMessenger.of(context).showSnackBar(

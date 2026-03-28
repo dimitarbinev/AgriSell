@@ -200,6 +200,25 @@ final sellerProductsProvider = FutureProvider<List<Product>>((ref) {
   return ref.watch(productServiceProvider).getProducts();
 });
 
+/// HTTP-backed product/listing caches do not auto-refresh. Call after add product,
+/// create listing, place order, etc.
+///
+/// [listingSellerId] — when the acting user is a buyer (e.g. reservation), pass the
+/// listing's seller so their public profile / Firestore listings refresh; omit when
+/// the seller mutates their own catalog (defaults to current user).
+void invalidateProductListingCaches(WidgetRef ref, {String? listingSellerId}) {
+  ref.invalidate(sellerProductsProvider);
+  ref.invalidate(activeListingsProvider);
+  final trimmed = listingSellerId?.trim();
+  final sid = (trimmed != null && trimmed.isNotEmpty)
+      ? trimmed
+      : ref.read(authStateProvider).value?.uid;
+  if (sid != null) {
+    ref.invalidate(sellerProfileProvider(sid));
+    ref.invalidate(sellerListingsProvider(sid));
+  }
+}
+
 // ─── Listing Reservations ───
 final listingReservationsProvider =
     StreamProvider.family<List<Reservation>, String>((ref, listingId) {
@@ -275,6 +294,24 @@ final myReservationsProvider = StreamProvider<List<Reservation>>((ref) {
             snap.docs.map((d) => Reservation.fromJson(d.data(), d.id)).toList();
         reservations.sort((a, b) => b.createdAt.compareTo(a.createdAt));
         return reservations;
+      });
+});
+
+/// Reviews written by the current user (buyer profile «отзиви» count).
+final buyerWrittenReviewsProvider = StreamProvider<List<Review>>((ref) {
+  final user = ref.watch(authStateProvider).value;
+  if (user == null) return Stream.value([]);
+
+  return ref
+      .watch(firestoreProvider)
+      .collection('reviews')
+      .where('buyerId', isEqualTo: user.uid)
+      .snapshots()
+      .map((snap) {
+        final list =
+            snap.docs.map((d) => Review.fromJson(d.data(), d.id)).toList();
+        list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        return list;
       });
 });
 

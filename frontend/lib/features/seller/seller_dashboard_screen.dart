@@ -66,22 +66,8 @@ class SellerDashboardScreen extends ConsumerWidget {
                             color: Colors.white,
                           ),
                         ),
-                        loading: () => const Text(
-                          '...',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w800,
-                            color: Colors.white,
-                          ),
-                        ),
-                        error: (err, stack) => const Text(
-                          'Продавач',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w800,
-                            color: Colors.white,
-                          ),
-                        ),
+                        loading: () => const Text('...', style: TextStyle(fontSize: 20, color: Colors.white)),
+                        error: (err, stack) => const Text('Продавач', style: TextStyle(fontSize: 20, color: Colors.white)),
                       ),
                     ],
                   ),
@@ -105,7 +91,7 @@ class SellerDashboardScreen extends ConsumerWidget {
                       physics: const NeverScrollableScrollPhysics(),
                       mainAxisSpacing: 12,
                       crossAxisSpacing: 12,
-                      childAspectRatio: 1.5,
+                      childAspectRatio: 1.1, // ✅ Променено от 1.5 на 1.1 за повече място
                       children: [
                         _MetricCard(
                           icon: Icons.storefront_rounded,
@@ -168,22 +154,16 @@ class SellerDashboardScreen extends ConsumerWidget {
                       alignment: Alignment.centerLeft,
                       child: Text(
                         'Предстояща активност',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
-                        ),
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Colors.white),
                       ),
                     ),
                     const SizedBox(height: 14),
                     () {
                       final today = DateTime.now();
                       final startOfToday = DateTime(today.year, today.month, today.day);
-                      
                       final sortedListings = listings
                           .where((l) => l.endDate.isAfter(startOfToday.subtract(const Duration(seconds: 1))))
                           .toList();
-                          
                       sortedListings.sort((a, b) => a.startDate.compareTo(b.startDate));
                       
                       if (sortedListings.isEmpty) {
@@ -252,19 +232,80 @@ class SellerDashboardScreen extends ConsumerWidget {
                       error: (err, _) => Center(child: Text('Error: $err', style: const TextStyle(color: Colors.white))),
                     ),
                     const SizedBox(height: 40),
-                    ],
-                  );
-                },
-                loading: () => const Center(child: CircularProgressIndicator()),
-                error: (err, stack) => Center(child: Text('Error: $err')),
-              ),
-            ],
+                  ],
+                );
+              },
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (err, stack) => Center(child: Text('Error: $err')),
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
+class _MetricCard extends StatelessWidget {
+  final IconData icon;
+  final Color iconColor;
+  final String label;
+  final String value;
+
+  const _MetricCard({
+    required this.icon,
+    required this.iconColor,
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: glassDecoration(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: iconColor.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
+            ),
+            child: Icon(icon, size: 18, color: iconColor),
+          ),
+          const Spacer(),
+          // ✅ FittedBox за защита на големи числа
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              value,
+              style: const TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w800,
+                color: AppTheme.textPrimary,
+              ),
+            ),
+          ),
+          const SizedBox(height: 2),
+          // ✅ Текстът е защитен с maxLines
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 11,
+              color: AppTheme.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// Помощни уиджети (остават същите като логика, но подредени)
 class _NotifBell extends StatelessWidget {
   final VoidCallback onTap;
   const _NotifBell({required this.onTap});
@@ -291,67 +332,11 @@ class _NotifBell extends StatelessWidget {
               child: Container(
                 width: 8,
                 height: 8,
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: AppTheme.statusCancelled,
-                ),
+                decoration: const BoxDecoration(shape: BoxShape.circle, color: AppTheme.statusCancelled),
               ),
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _MetricCard extends StatelessWidget {
-  final IconData icon;
-  final Color iconColor;
-  final String label;
-  final String value;
-
-  const _MetricCard({
-    required this.icon,
-    required this.iconColor,
-    required this.label,
-    required this.value,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: glassDecoration(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: iconColor.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
-            ),
-            child: Icon(icon, size: 18, color: iconColor),
-          ),
-          const Spacer(),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.w800,
-              color: AppTheme.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 12,
-              color: AppTheme.textSecondary,
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -362,11 +347,7 @@ class _QuickAction extends StatelessWidget {
   final String label;
   final VoidCallback onTap;
 
-  const _QuickAction({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
+  const _QuickAction({required this.icon, required this.label, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -383,21 +364,13 @@ class _QuickAction extends StatelessWidget {
           children: [
             Icon(icon, color: Colors.white, size: 20),
             const SizedBox(width: 8),
-            Text(
-              label,
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
-                fontSize: 14,
-              ),
-            ),
+            Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14)),
           ],
         ),
       ),
     );
   }
 }
-
 
 void _showAddMenu(BuildContext context) {
   showModalBottomSheet(
@@ -423,11 +396,7 @@ void _showAddMenu(BuildContext context) {
           const SizedBox(height: 24),
           const Text(
             'Създай ново',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w800,
-              color: Colors.white,
-            ),
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Colors.white),
           ),
           const SizedBox(height: 24),
           _AddMenuOption(
@@ -462,12 +431,7 @@ class _AddMenuOption extends StatelessWidget {
   final String subtitle;
   final VoidCallback onTap;
 
-  const _AddMenuOption({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.onTap,
-  });
+  const _AddMenuOption({required this.icon, required this.title, required this.subtitle, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -491,21 +455,8 @@ class _AddMenuOption extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
-                    ),
-                  ),
-                  Text(
-                    subtitle,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.white.withValues(alpha: 0.7),
-                    ),
-                  ),
+                  Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white)),
+                  Text(subtitle, style: TextStyle(fontSize: 13, color: Colors.white.withValues(alpha: 0.7))),
                 ],
               ),
             ),
