@@ -180,9 +180,20 @@ class _BuyerMapScreenState extends ConsumerState<BuyerMapScreen> {
                 controller: _searchController,
                 style: const TextStyle(color: Colors.white),
                 decoration: InputDecoration(
-                  hintText: 'Търси хора наблизо...',
+                  hintText: 'Търси хора, градове...',
                   hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.4)),
                   prefixIcon: const Icon(Icons.search, size: 22, color: Colors.white70),
+                  suffixIcon: _searchQuery.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.close, size: 20, color: Colors.white70),
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() {
+                              _searchQuery = '';
+                            });
+                          },
+                        )
+                      : null,
                   border: InputBorder.none,
                   enabledBorder: InputBorder.none,
                   focusedBorder: InputBorder.none,

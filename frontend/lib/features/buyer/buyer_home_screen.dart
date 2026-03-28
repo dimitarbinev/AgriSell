@@ -121,16 +121,25 @@ class _BuyerHomeScreenState extends ConsumerState<BuyerHomeScreen> {
               child: TextField(
                 controller: _searchController,
                 style: const TextStyle(color: AppTheme.textPrimary),
+                onChanged: (val) => setState(() {}),
                 decoration: InputDecoration(
                   hintText: 'Търси продукти, продавачи, градове...',
                   hintStyle: const TextStyle(color: AppTheme.textSecondary),
                   prefixIcon: const Icon(Icons.search, size: 22, color: AppTheme.textSecondary),
                   border: InputBorder.none,
                   contentPadding: const EdgeInsets.symmetric(vertical: 14),
-                  suffixIcon: IconButton(
-                    icon: const Icon(Icons.tune, size: 20, color: AppTheme.accentGreen),
-                    onPressed: () {},
-                  ),
+                  suffixIcon: _searchController.text.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.close, size: 20, color: AppTheme.textSecondary),
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() {});
+                          },
+                        )
+                      : IconButton(
+                          icon: const Icon(Icons.tune, size: 20, color: AppTheme.accentGreen),
+                          onPressed: () {},
+                        ),
                 ),
               ),
             ),
@@ -180,10 +189,12 @@ class _BuyerHomeScreenState extends ConsumerState<BuyerHomeScreen> {
                     data: (listings) {
                       final filtered = listings.where((l) {
                         final isOwnListing = currentUserId != null && l.sellerId == currentUserId;
+                        final query = _searchController.text.toLowerCase();
                         final matchesCategory = _selectedCategory == null || l.productCategory == _selectedCategory;
-                        final matchesSearch = _searchController.text.isEmpty ||
-                            l.productName.toLowerCase().contains(_searchController.text.toLowerCase()) ||
-                            l.city.toLowerCase().contains(_searchController.text.toLowerCase());
+                        final matchesSearch = query.isEmpty ||
+                            l.productName.toLowerCase().contains(query) ||
+                            (l.sellerName?.toLowerCase().contains(query) ?? false) ||
+                            l.city.toLowerCase().contains(query);
                         return !isOwnListing && matchesCategory && matchesSearch;
                       }).toList();
 
