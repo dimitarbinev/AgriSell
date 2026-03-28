@@ -40,7 +40,7 @@ export const register = catch_async(async (req: Request, res: Response) => {
         await db.collection('users').doc(uid).set({
             name,
             email,
-            password, // NOTE: Not ideal to store plain text, but keeping as is for now
+            password,
             role,
             city: city || mainCity || "",
             phone: phone || phoneNumber || "",
