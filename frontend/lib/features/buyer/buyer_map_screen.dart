@@ -23,7 +23,6 @@ class _BuyerMapScreenState extends ConsumerState<BuyerMapScreen> {
 
   final _searchController = TextEditingController();
   String _searchQuery = '';
-  String? _selectedCategory;
   GoogleMapController? _mapController;
   int _lastFitMarkerCount = -1;
 
@@ -100,7 +99,6 @@ class _BuyerMapScreenState extends ConsumerState<BuyerMapScreen> {
             listings: listings,
             currentUserId: currentUserId,
             search: _searchQuery,
-            category: _selectedCategory,
           ),
           orElse: () => _buildCombinedMapMarkers(
             sellers: sellers,
@@ -108,7 +106,6 @@ class _BuyerMapScreenState extends ConsumerState<BuyerMapScreen> {
             listings: listings,
             currentUserId: currentUserId,
             search: _searchQuery,
-            category: _selectedCategory,
           ),
         );
       },
@@ -194,36 +191,6 @@ class _BuyerMapScreenState extends ConsumerState<BuyerMapScreen> {
             ),
           ),
 
-          Positioned(
-            top: MediaQuery.of(context).padding.top + 72,
-            left: 20,
-            right: 0,
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  _CategoryChip(
-                    label: 'Всички',
-                    selected: _selectedCategory == null,
-                    onTap: () => setState(() {
-                      _selectedCategory = null;
-                      _lastFitMarkerCount = -1;
-                    }),
-                  ),
-                  ...AppConstants.productCategories.take(12).map(
-                        (c) => _CategoryChip(
-                          label: c,
-                          selected: _selectedCategory == c,
-                          onTap: () => setState(() {
-                            _selectedCategory = c;
-                            _lastFitMarkerCount = -1;
-                          }),
-                        ),
-                      ),
-                ],
-              ),
-            ),
-          ),
 
           if (markers.isEmpty &&
               sellersAsync.hasValue &&
@@ -372,19 +339,7 @@ List<_MapMarker> _buildCombinedMapMarkers({
   required List<Listing> listings,
   String? currentUserId,
   required String search,
-  String? category,
 }) {
-  Set<String>? sellerIdsForCategory;
-  if (category != null && category.isNotEmpty) {
-    if (listings.isEmpty) {
-      sellerIdsForCategory = null;
-    } else {
-      sellerIdsForCategory = listings
-          .where((l) => l.productCategory == category)
-          .map((l) => l.sellerId)
-          .toSet();
-    }
-  }
 
   List<String> productChipsForSeller(String sellerId) {
     final names = listings
@@ -401,10 +356,6 @@ List<_MapMarker> _buildCombinedMapMarkers({
 
   final filteredSellers = sellers.where((s) {
     if (currentUserId != null && s.id == currentUserId) return false;
-    if (sellerIdsForCategory != null) {
-      if (sellerIdsForCategory.isEmpty) return false;
-      if (!sellerIdsForCategory.contains(s.id)) return false;
-    }
     if (search.trim().isNotEmpty) {
       final q = search.toLowerCase();
       final cityResolved = AppConstants.resolveCityForMap(s.mainCity) ?? s.mainCity;
@@ -431,15 +382,11 @@ List<_MapMarker> _buildCombinedMapMarkers({
       roleLabel: 'Продавач',
     ));
   }
-
   final onMapSellerIds = raw.map((m) => m.userId).toSet();
-
-  final categoryFiltersUsers = category != null && category.isNotEmpty;
 
   for (final u in directoryUsers) {
     if (currentUserId != null && u.id == currentUserId) continue;
     if (onMapSellerIds.contains(u.id)) continue;
-    if (categoryFiltersUsers) continue;
 
     if (search.trim().isNotEmpty) {
       final q = search.toLowerCase();
@@ -526,44 +473,3 @@ class _MapMarker {
   });
 }
 
-class _CategoryChip extends StatelessWidget {
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  const _CategoryChip({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(right: 8),
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          decoration: BoxDecoration(
-            color: selected ? AppTheme.accentGreen : Colors.black.withValues(alpha: 0.4),
-            borderRadius: BorderRadius.circular(AppTheme.radiusXLarge),
-            border: Border.all(
-              color: selected
-                  ? Colors.white.withValues(alpha: 0.2)
-                  : Colors.white.withValues(alpha: 0.1),
-            ),
-          ),
-          child: Text(
-            label,
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: Colors.white,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
