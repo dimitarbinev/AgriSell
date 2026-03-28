@@ -13,7 +13,7 @@ export const productListing = catch_async(async (req: Request, res: Response) =>
     if (missingFields.length > 0) {
         console.log("Missing fields in product listing:", missingFields);
         return res.status(400).json({
-            message: `Missing fields: ${missingFields.join(', ')}`
+            message: `Липсващи полета: ${missingFields.join(', ')}`
         });
     }
 
@@ -45,12 +45,12 @@ export const productListing = catch_async(async (req: Request, res: Response) =>
     const userRef = await db.collection("users").doc(uid).get();
 
     if (!userRef.exists) {
-        return res.status(404).json({ message: "User not found" });
+        return res.status(404).json({ message: "Потребителят не е намерен" });
     }
 
     const userRole = userRef.data()?.role;
     if (userRole !== "seller") {
-        return res.status(403).json({ message: "User is not a seller" });
+        return res.status(403).json({ message: "Потребителят не е продавач" });
     }
 
     await db.collection("users").doc(uid).collection('products').add({
@@ -67,21 +67,21 @@ export const productListing = catch_async(async (req: Request, res: Response) =>
         createdAt: new Date()
     })
 
-    return res.status(200).json({message: "Product listed successfully"})
+    return res.status(200).json({message: "Продуктът е добавен успешно"})
 })
 
 export const listingConfirmation = catch_async(async (req: Request, res: Response) => {
     const {productId, startDate, endDate} = req.body;
 
     if(!productId || !startDate || !endDate) {
-        return res.status(400).json({message: "Invalid request"})
+        return res.status(400).json({message: "Невалидна заявка"})
     }
 
     const uid = req.user?.uid as string;
     const userRef = await db.collection("users").doc(uid).get();
 
     if (!userRef.exists) {
-        return res.status(404).json({ message: "User not found" });
+        return res.status(404).json({ message: "Потребителят не е намерен" });
     }
 
     const productDoc = await db.collection("users").doc(uid).collection('products').doc(productId).get();
@@ -89,7 +89,7 @@ export const listingConfirmation = catch_async(async (req: Request, res: Respons
 
     const userRole = userRef.data()?.role;
     if (userRole !== "seller") {
-        return res.status(403).json({ message: "User is not a seller" });
+        return res.status(403).json({ message: "Потребителят не е продавач" });
     }
 
     // 4. Create Listing sub-collection document (Slimmer than Product doc)
@@ -116,7 +116,7 @@ export const listingConfirmation = catch_async(async (req: Request, res: Respons
         lastListingAt: new Date() // Forces parent snapshots to fire
     });
 
-    return res.status(200).json({message: "Listing confirmed successfully"})
+    return res.status(200).json({message: "Обявата е потвърдена успешно"})
 })
 
 export const getProducts = catch_async(async (req: Request, res: Response) => {
@@ -164,19 +164,19 @@ export const updateListingStatus = catch_async(async (req: Request, res: Respons
     const { productId, listingId, status } = req.body;
 
     if (!productId || !listingId || status === undefined) {
-        return res.status(400).json({ message: "Invalid request: productId, listingId, and status are required" });
+        return res.status(400).json({ message: "Невалидна заявка: productId, listingId и status са задължителни" });
     }
 
     const uid = req.user?.uid as string;
     const userRef = await db.collection("users").doc(uid).get();
 
     if (!userRef.exists) {
-        return res.status(404).json({ message: "User not found" });
+        return res.status(404).json({ message: "Потребителят не е намерен" });
     }
 
     const sellerDoc = await db.collection("users").doc(uid).collection('products').doc(productId).collection("listings").doc(listingId).get();
     if (!sellerDoc.exists) {
-        return res.status(404).json({ message: "Listing not found" });
+        return res.status(404).json({ message: "Обявата не е намерена" });
     }
 
     await db.collection("users").doc(uid).collection('products').doc(productId).collection("listings").doc(listingId).update({
@@ -184,5 +184,5 @@ export const updateListingStatus = catch_async(async (req: Request, res: Respons
         updatedAt: new Date()
     });
 
-    return res.status(200).json({ message: "Listing status updated successfully" });
+    return res.status(200).json({ message: "Статусът на обявата е обновен успешно" });
 });

@@ -11,7 +11,7 @@ export const register = catch_async(async (req: Request, res: Response) => {
     if(!email || !password || !name || !role) {
         console.log("[REGISTER] Validation failed");
         return res.status(400).json({
-            message: "Missing required fields"
+            message: "Липсват задължителни полета"
         });
     }
 
@@ -48,12 +48,12 @@ export const register = catch_async(async (req: Request, res: Response) => {
         });
 
         console.log("[REGISTER] Registration complete for:", email);
-        return res.status(200).json({status: "success", message: "User registered successfully"});
+        return res.status(200).json({status: "success", message: "Потребителят е регистриран успешно"});
     } catch (error: any) {
         console.error("[REGISTER] ERROR:", error);
         return res.status(500).json({
             status: "error",
-            message: error.message || "An internal error occurred during registration"
+            message: error.message || "Възникна вътрешна грешка по време на регистрацията"
         });
     }
 })
@@ -64,7 +64,7 @@ export const getProfile = catch_async(async (req: Request, res: Response) => {
     const doc = await db.collection('users').doc(uid).get()
 
     if (!doc.exists) {
-      return res.status(404).json({ message: "Profile not found" });
+      return res.status(404).json({ message: "Профилът не е намерен" });
     }
 
     res.json({
@@ -79,7 +79,7 @@ export const changeRole = catch_async(async (req: Request, res: Response) => {
     const {role} = req.body;
 
     if(!role) {
-        return res.status(400).json({message: "Invalid role"})
+        return res.status(400).json({message: "Невалидна роля"})
     }
 
     await db.collection('users').doc(uid).set({
@@ -87,7 +87,7 @@ export const changeRole = catch_async(async (req: Request, res: Response) => {
         updatedAt: new Date()
     }, { merge: true })
 
-    return res.status(200).json({message: "Role changed successfully"})
+    return res.status(200).json({message: "Ролята е променена успешно"})
 })
 
 export const getProfileName = catch_async(async (req: Request, res: Response) => {
@@ -95,7 +95,7 @@ export const getProfileName = catch_async(async (req: Request, res: Response) =>
     const userRef = await db.collection("users").doc(uid).get();
 
     if (!userRef.exists) {
-        return res.status(404).json({ message: "User not found" });
+        return res.status(404).json({ message: "Потребителят не е намерен" });
     }
 
     return res.status(200).json({name: userRef.data()?.name});
@@ -116,7 +116,7 @@ export const updateCredentials = catch_async(async (req: Request, res: Response)
 
     const doc = await db.collection('users').doc(uid).get();
     if (!doc.exists) {
-        return res.status(404).json({ message: "User not found" });
+        return res.status(404).json({ message: "Потребителят не е намерен" });
     }
 
     const firestoreUpdates: any = { updatedAt: new Date() };
@@ -128,5 +128,5 @@ export const updateCredentials = catch_async(async (req: Request, res: Response)
 
     await db.collection('users').doc(uid).update(firestoreUpdates);
 
-    return res.status(200).json({message: "Credentials updated successfully"});
+    return res.status(200).json({message: "Данните бяха обновени успешно"});
 });

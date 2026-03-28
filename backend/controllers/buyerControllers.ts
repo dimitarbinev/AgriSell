@@ -62,22 +62,22 @@ export const placeOrder = catch_async(async (req: Request, res: Response) => {
     console.log(`[placeOrder] Request: listingId=${listingId}, qty=${quantity}, sellerId=${sellerId}, productId=${productId}`);
 
     if (!listingId || quantity === undefined || deposit === undefined || !sellerId || !productId) {
-        return res.status(400).json({ message: "Invalid request: missing fields" });
+        return res.status(400).json({ message: "Невалидна заявка: липсващи полета" });
     }
 
     if (Number(quantity) <= 0 || Number(deposit) < 0) {
-        return res.status(400).json({ message: "Quantity must be greater than 0" });
+        return res.status(400).json({ message: "Количеството трябва да е по-голямо от 0" });
     }
 
     const uid = req.user?.uid as string;
     const userDoc = await db.collection("users").doc(uid).get();
 
     if (!userDoc.exists) {
-        return res.status(404).json({ message: "User not found" });
+        return res.status(404).json({ message: "Потребителят не е намерен" });
     }
 
     if (userDoc.data()?.role !== "buyer") {
-        return res.status(403).json({ message: "User is not a buyer" });
+        return res.status(403).json({ message: "Потребителят не е купувач" });
     }
 
     const buyerName = userDoc.data()?.name || "Anonymous";
@@ -100,7 +100,7 @@ export const placeOrder = catch_async(async (req: Request, res: Response) => {
     const activeRes = existingRes.docs.find(d => d.data().status !== 'cancelled');
     if (activeRes) {
         return res.status(400).json({ 
-            message: "You already have an active reservation for this listing. Please cancel it before re-ordering." 
+            message: "Вече имаш активна поръчка за този продукт." 
         });
     }
 
@@ -110,14 +110,14 @@ export const placeOrder = catch_async(async (req: Request, res: Response) => {
             const productDoc = await transaction.get(productRef);
 
             if (!listingDoc.exists || !productDoc.exists) {
-                throw new Error("Listing or Product not found");
+                throw new Error("Обявата или продуктът не са намерени");
             }
 
             const listingData = listingDoc.data()!;
             const productData = productDoc.data()!;
 
             if (listingData.status === 3 || listingData.status === 'cancelled') {
-                throw new Error("Listing is cancelled and can not take reservations");
+                throw new Error("Обявата е отменена и не може да приема резервации");
             }
 
             const currentQty = Number(listingData.requestedQuantity || 0);
@@ -128,7 +128,7 @@ export const placeOrder = catch_async(async (req: Request, res: Response) => {
 
             // 1. Capacity Check
             if (newTotalQty > maxCapacity) {
-                throw new Error(`Insufficient capacity. Only ${Math.max(0, maxCapacity - currentQty)} kg remaining.`);
+                throw new Error(`Недостатъчно количество. Остават само ${Math.max(0, maxCapacity - currentQty)} кг.`);
             }
 
             // 2. Prepare Updates
@@ -197,7 +197,7 @@ export const placeOrder = catch_async(async (req: Request, res: Response) => {
             console.error("[Telegram] Prepare error:", notifErr);
         }
 
-        return res.status(200).json({ message: "Order placed successfully" });
+        return res.status(200).json({ message: "Поръчката е направена успешно" });
     } catch (error: any) {
         console.error(`[placeOrder] Transaction failed:`, error.message);
         return res.status(400).json({ message: error.message });
@@ -209,7 +209,7 @@ export const getSellerProfile = catch_async(async (req: Request, res: Response) 
     const sellerDoc = await db.collection("users").doc(id).get();
 
     if (!sellerDoc.exists) {
-        return res.status(404).json({ message: "Seller not found" });
+        return res.status(404).json({ message: "Продавачът не е намерен" });
     }
 
     const sellerData = sellerDoc.data()!;
@@ -292,7 +292,7 @@ export const getSellerProfile = catch_async(async (req: Request, res: Response) 
 
 export const getMyReviews = catch_async(async (req: Request, res: Response) => {
     const uid = req.user?.uid;
-    if (!uid) return res.status(401).json({ message: "Unauthorized" });
+    if (!uid) return res.status(401).json({ message: "Неоторизиран достъп" });
 
     const snapshot = await db.collection("reviews")
         .where("sellerId", "==", uid)
@@ -312,7 +312,7 @@ export const getMyReviews = catch_async(async (req: Request, res: Response) => {
 export const getMyReservations = catch_async(async (req: Request, res: Response) => {
     const uid = req.user?.uid;
     if (!uid) {
-        return res.status(401).json({ message: "Unauthorized" });
+        return res.status(401).json({ message: "Неоторизиран достъп" });
     }
 
     const snapshot = await db.collection("reservations").where("buyerId", "==", uid).get();
@@ -373,7 +373,7 @@ export const cancelReservation = catch_async(async (req: Request, res: Response)
     const uid = req.user?.uid;
 
     if (!reservationId || !uid) {
-        return res.status(400).json({ message: "Reservation ID and UID required" });
+        return res.status(400).json({ message: "ID на резервацията и UID са задължителни" });
     }
 
     const resRef = db.collection("reservations").doc(reservationId);
@@ -383,20 +383,20 @@ export const cancelReservation = catch_async(async (req: Request, res: Response)
             // ─── 1. ALL READS FIRST ───
             const resDoc = await transaction.get(resRef);
             if (!resDoc.exists) {
-                throw new Error("Reservation not found");
+                throw new Error("Резервацията не е намерена");
             }
 
             const resData = resDoc.data()!;
             if (resData.buyerId !== uid && resData.sellerId !== uid) {
-                throw new Error("Unauthorized to cancel this reservation");
+                throw new Error("Нямате право да отменяте тази резервация");
             }
 
             if (resData.status === 'cancelled') {
-                throw new Error("Reservation already cancelled");
+                throw new Error("Резервацията вече е отменена");
             }
             if (resData.status === 'confirmed' || resData.status === 'completed') {
                 const isBuyer = uid === resData.buyerId;
-                throw new Error(isBuyer ? "Cannot cancel a confirmed or completed reservation. Please contact the seller." : "Cannot cancel a confirmed or completed reservation.");
+                throw new Error(isBuyer ? "Не може да бъде отменена потвърдена или приключена резервация. Моля, свържете се с продавача." : "Не може да бъде отменена потвърдена или приключена резервация.");
             }
 
             // Read listing info if necessary
@@ -444,7 +444,7 @@ export const cancelReservation = catch_async(async (req: Request, res: Response)
             }
         });
 
-        return res.status(200).json({ message: "Reservation cancelled successfully" });
+        return res.status(200).json({ message: "Резервацията беше отменена успешно" });
     } catch (error: any) {
         console.error(`[cancelReservation] Transaction failed:`, error.message);
         return res.status(400).json({ message: error.message });
@@ -456,7 +456,7 @@ export const submitReview = catch_async(async (req: Request, res: Response) => {
     const buyerId = req.user?.uid;
 
     if (!sellerId || !rating) {
-        return res.status(400).json({ message: "Seller ID and rating are required." });
+        return res.status(400).json({ message: "ID на продавача и рейтинг са задължителни." });
     }
 
     const buyerDoc = await db.collection("users").doc(buyerId!).get();
@@ -503,5 +503,5 @@ export const submitReview = catch_async(async (req: Request, res: Response) => {
         }
     });
 
-    return res.status(200).json({ id: reviewRef.id, message: "Review submitted successfully" });
+    return res.status(200).json({ id: reviewRef.id, message: "Отзивът беше изпратен успешно" });
 });

@@ -6,7 +6,7 @@ export const verifyToken = async (req: Request, res: Response, next: NextFunctio
     const header = req.headers.authorization;
 
     if (!header || !header.startsWith("Bearer ")) {
-      return res.status(401).json({ message: "No token provided" });
+      return res.status(401).json({ message: "Токенът не е предоставен" });
     }
 
     const token = header.split(" ")[1];
@@ -16,7 +16,7 @@ export const verifyToken = async (req: Request, res: Response, next: NextFunctio
     req.user = decoded;
     next();
   } catch (error) {
-    res.status(401).json({ message: "Invalid token" });
+    res.status(401).json({ message: "Невалиден токен" });
   }
 };
 
@@ -35,7 +35,7 @@ import { rateLimit } from 'express-rate-limit';
 export const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, 
     max: 10, 
-    message: { message: "Too many authentication requests from this IP, please try again after 15 minutes" },
+    message: { message: "Твърде много опити за автентикация от този IP адрес, моля опитайте отново след 15 минути" },
     standardHeaders: true,
     legacyHeaders: false,
 });
@@ -44,7 +44,7 @@ export const authLimiter = rateLimit({
 export const sellerLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, 
     max: 50, 
-    message: { message: "Too many requests from this IP, please try again after 15 minutes" },
+    message: { message: "Твърде много заявки от този IP адрес, моля опитайте отново след 15 минути" },
     standardHeaders: true,
     legacyHeaders: false,
 });

@@ -8,7 +8,7 @@ export const classifyProduct = catch_async(async (req: Request, res: Response) =
     const nameToUse = product_name || productName;
 
     if (!nameToUse) {
-        return res.status(400).json({ message: "productName or product_name is required" });
+        return res.status(400).json({ message: "productName или product_name е задължително" });
     }
 
     try {
@@ -30,14 +30,14 @@ export const classifyProduct = catch_async(async (req: Request, res: Response) =
         return res.status(200).json(data);
     } catch (error: any) {
         console.error("Error calling AI service:", error);
-        return res.status(500).json({ message: "Failed to classify product", error: error.message });
+        return res.status(500).json({ message: "Неуспешно класифициране на продукта", error: error.message });
     }
 });
 export const priceSuggestion = catch_async(async (req: Request, res: Response) => {
     const { product_name, season } = req.body;
 
     if (!product_name) {
-        return res.status(400).json({ message: "product_name is required" });
+        return res.status(400).json({ message: "product_name е задължително" });
     }
 
     try {
@@ -59,6 +59,6 @@ export const priceSuggestion = catch_async(async (req: Request, res: Response) =
         return res.status(200).json(data);
     } catch (error: any) {
         console.error("Error calling AI service:", error);
-        return res.status(500).json({ message: "Failed to get price suggestion", error: error.message });
+        return res.status(500).json({ message: "Неуспешно получаване на предложение за цена", error: error.message });
     }
 });
