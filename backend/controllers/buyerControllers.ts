@@ -91,6 +91,19 @@ export const placeOrder = catch_async(async (req: Request, res: Response) => {
     const productRef = db.collection("users").doc(sellerId)
         .collection('products').doc(productId);
 
+    // ─── One Order Per Listing Check ───
+    const existingRes = await db.collection("reservations")
+        .where("listingId", "==", listingId)
+        .where("buyerId", "==", uid)
+        .get();
+        
+    const activeRes = existingRes.docs.find(d => d.data().status !== 'cancelled');
+    if (activeRes) {
+        return res.status(400).json({ 
+            message: "You already have an active reservation for this listing. Please cancel it before re-ordering." 
+        });
+    }
+
     try {
         const txResult = await db.runTransaction(async (transaction) => {
             const listingDoc = await transaction.get(listingRef);
